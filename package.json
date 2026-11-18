@@ -1,0 +1,21 @@
+{
+  "name": "tabby-oneai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Project-based AI CLI workspace for Tabby",
+  "author": "Dongdong",
+  "keywords": ["tabby-plugin"],
+  "main": "dist/index.js",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@angular/common": "15.2.10",
+    "@angular/core": "15.2.10",
+    "@types/node": "22.19.17",
+    "rxjs": "7.8.2",
+    "typescript": "5.8.3",
+    "zone.js": "0.13.3"
+  }
+}
