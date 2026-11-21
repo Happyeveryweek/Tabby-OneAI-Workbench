@@ -1,6 +1,6 @@
 # Tabby-OneAI-Workbench 项目规则
 
-东东维护本项目。`DESIGN.md` 和 `prototype.html` 是界面与交互基准，`IMPLEMENTATION.md` 记录实施计划，`ROADMAP.md` 记录实际进度与验证。
+东东维护本项目。`DESIGN.md`、`docs/ui-redesign-prototype.html` 和 `docs/usage-prototype.html` 是界面与交互基准，`IMPLEMENTATION.md` 记录实施计划，`ROADMAP.md` 记录实际进度与验证。
 
 - 根目录为独立 Tabby 插件包。实现放在 `src/`，构建结果放在 `dist/`，实机验收记录放在 `docs/`。
 - 原生终端、PTY、标签及分屏由官方 Tabby 管理。宿主布局选择器集中在布局适配器，挂载失败时保留工具栏打开工作台的入口。

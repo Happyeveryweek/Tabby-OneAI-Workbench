@@ -124,8 +124,11 @@ interface RemovedProjectGroup {
         .card-head strong { font-size:var(--oneai-size-body); white-space:nowrap; flex:none; }
         .card-head small { font-size:var(--oneai-size-caption); color:var(--palette-fg-subtle,color-mix(in srgb,currentColor 70%,transparent)); }
 
-        .typography-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
-        .appearance-letter-spacing { grid-column:1 / -1; }
+        .typography-grid { display:grid; grid-template-columns:1.15fr 1fr; gap:14px; align-items:start; }
+        .typography-grid .card-head { min-height:22px; margin-bottom:8px; }
+        .appearance-letter-spacing { grid-column:1 / -1; padding-top:12px; border-top:1px solid var(--line); }
+        .appearance-letter-spacing .card-head { margin-bottom:4px; }
+        .spacing-hint { display:block; margin-bottom:8px; font-size:var(--oneai-size-caption); line-height:1.45; }
         .segmented { display:inline-flex; padding:3px; border-radius:9px;
             background:var(--palette-panel,color-mix(in srgb,currentColor 5%,transparent)); border:1px solid var(--line); gap:2px; }
         .segmented button { padding:4px 10px; border-radius:6px; border:1px solid transparent; background:transparent;
@@ -134,11 +137,20 @@ interface RemovedProjectGroup {
             border-color:color-mix(in srgb,var(--accent) 42%,transparent); font-weight:600; }
         .size-pill { font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-caption); padding:2px 7px; border-radius:6px;
             background:var(--palette-control,transparent); border:1px solid var(--line); color:var(--accent); font-weight:600;
-            font-variant-numeric:tabular-nums; }
+            font-variant-numeric:tabular-nums; min-width:56px; text-align:center; box-sizing:border-box; }
         .size-actions { display:flex; align-items:center; gap:6px; }
         .font-reset-btn { padding:2px 8px; border-radius:6px; font-size:var(--oneai-size-small); border:1px solid var(--line); }
-        .font-size-slider { display:flex; align-items:center; gap:9px; margin-top:8px; }
-        input[type=range] { flex:1; width:100%; accent-color:var(--accent); cursor:pointer; }
+        .font-size-slider { display:flex; align-items:center; gap:9px; min-height:34px; margin-top:0; }
+        .appearance-letter-spacing .font-size-slider { min-height:24px; margin-top:4px; }
+        .font-size-slider small { font-size:var(--oneai-size-caption); font-variant-numeric:tabular-nums; flex:none; }
+        input[type=range] { -webkit-appearance:none; appearance:none; flex:1; width:100%; height:20px; color:inherit; background:transparent; cursor:pointer; outline:none; margin:0; }
+        input[type=range]::-webkit-slider-runnable-track { height:4px; border-radius:999px;
+            background:linear-gradient(90deg, var(--accent) 0%, var(--accent) var(--pct, 0%), var(--palette-line-strong,color-mix(in srgb,currentColor 24%,transparent)) var(--pct, 0%), var(--palette-line-strong,color-mix(in srgb,currentColor 24%,transparent)) 100%); }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:14px; height:14px; margin-top:-5px; border-radius:50%;
+            background:var(--accent); border:2px solid var(--palette-surface,var(--theme-bg,#151c25));
+            box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transparent); transition:transform .12s ease, box-shadow .12s ease; }
+        input[type=range]:hover::-webkit-slider-thumb, input[type=range]:focus-visible::-webkit-slider-thumb {
+            transform:scale(1.14); box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 24%,transparent); }
 
         /* 统一等高主题色卡网格 */
         .theme-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(136px,1fr)); gap:8px; }
@@ -457,7 +469,7 @@ interface RemovedProjectGroup {
                         <section class="setting-card" [attr.aria-label]="i18n.text('排版与字体设置', 'Typography settings')">
                             <div class="typography-grid">
                                 <div class="appearance-font-size">
-                                    <div class="card-head" style="margin-bottom:8px">
+                                    <div class="card-head">
                                         <strong id="oneai-font-size-label">{{ i18n.text('工作台字号', 'Font Size') }}</strong>
                                         <span class="size-actions">
                                             <button *ngIf="appearance.fontSize !== defaultSize" type="button" class="font-reset-btn"
@@ -468,13 +480,14 @@ interface RemovedProjectGroup {
                                     <label class="font-size-slider">
                                         <small class="muted">{{ appearanceSizeRange.min }}</small>
                                         <input type="range" [attr.aria-label]="i18n.text('工作台字号', 'Font Size')" [min]="appearanceSizeRange.min" [max]="appearanceSizeRange.max"
+                                            [style.--pct]="rangePercent(appearance.fontSize, appearanceSizeRange.min, appearanceSizeRange.max)"
                                             [value]="appearance.fontSize" (input)="setAppearanceSize($any($event.target).valueAsNumber)">
                                         <small class="muted">{{ appearanceSizeRange.max }}</small>
                                     </label>
                                 </div>
 
                                 <div class="appearance-font">
-                                    <div class="card-head" style="margin-bottom:8px">
+                                    <div class="card-head">
                                         <strong id="oneai-font-label">{{ i18n.text('工作台字体', 'Font Family') }}</strong>
                                         <span class="size-actions">
                                             <button *ngIf="appearance.fontFamily" type="button" class="font-reset-btn"
@@ -486,7 +499,7 @@ interface RemovedProjectGroup {
                                         <input #fontInput type="text" class="font-combo-input"
                                             aria-labelledby="oneai-font-label" aria-autocomplete="list"
                                             [attr.aria-expanded]="fontMenuOpen" aria-controls="oneai-font-menu"
-                                            [placeholder]="i18n.text('默认（Noto Sans SC + Cascadia Code）', 'Default (Noto Sans SC · Cascadia Code)')"
+                                            [placeholder]="i18n.text('默认（Noto Sans SC）', 'Default (Noto Sans SC)')"
                                             [value]="fontInputValue"
                                             (focus)="onFontFocus(fontCombo)"
                                             (click)="onFontClick(fontCombo)"
@@ -508,7 +521,7 @@ interface RemovedProjectGroup {
                                             <button *ngIf="showDefaultFontOption" type="button" class="font-option"
                                                 [attr.aria-pressed]="!appearance.fontFamily" [class.highlighted]="fontHighlight === -1"
                                                 (mousedown)="$event.preventDefault()" (click)="selectAppearanceFont('', fontInput)">
-                                                <span>{{ i18n.text('默认（Noto Sans SC + Cascadia Code）', 'Default (Noto Sans SC · Cascadia Code)') }}</span>
+                                                <span>{{ i18n.text('默认（Noto Sans SC）', 'Default (Noto Sans SC)') }}</span>
                                                 <span *ngIf="!appearance.fontFamily" class="font-check" aria-hidden="true">✓</span>
                                             </button>
                                             <button *ngFor="let font of matchingFonts; let idx = index; trackBy: trackByValue" type="button"
@@ -524,7 +537,7 @@ interface RemovedProjectGroup {
                                 </div>
 
                                 <div class="appearance-letter-spacing">
-                                    <div class="card-head" style="margin-bottom:4px">
+                                    <div class="card-head">
                                         <strong id="oneai-letter-spacing-label">{{ i18n.text('工作台字间距', 'Letter Spacing') }}</strong>
                                         <span class="size-actions">
                                             <button *ngIf="!appearance.isAutoLetterSpacing" type="button" class="font-reset-btn"
@@ -532,11 +545,12 @@ interface RemovedProjectGroup {
                                             <span class="size-pill spacing-pill">{{ formatLetterSpacing(appearance.letterSpacing, appearance.isAutoLetterSpacing) }}</span>
                                         </span>
                                     </div>
-                                    <small class="muted" style="display:block;margin-bottom:6px">{{ appearance.isWideMonoActive() ? i18n.text('已选等宽中文字体，自动收紧为 -0.9 px 字距与中英文词距', 'Auto -0.9 px spacing for selected wide mono CJK font') : i18n.text('默认双轨比例排版（0.0 px 无需微调）；切换 Maple Mono 等宽字体时将自动优化', 'Dual-track UI & mono typography (0.0 px default); auto-tightens for Maple Mono') }}</small>
+                                    <small class="muted spacing-hint">{{ appearance.isWideMonoActive() ? i18n.text('已选等宽中文字体，自动收紧为 -0.9 px 字距与中英文词距', 'Auto -0.9 px spacing for selected wide mono CJK font') : i18n.text('Noto Sans SC 默认 0.0 px 即可清晰混排无需调参；选用等宽中文字体时自动优化', 'Default 0.0 px needs no tuning with Noto Sans SC; auto-tightens for mono CJK fonts') }}</small>
                                     <label class="font-size-slider">
                                         <small class="muted">{{ appearanceSpacingRange.min }}</small>
                                         <input type="range" [attr.aria-label]="i18n.text('工作台字间距', 'Letter Spacing')"
                                             [min]="appearanceSpacingRange.min" [max]="appearanceSpacingRange.max" [step]="appearanceSpacingRange.step"
+                                            [style.--pct]="rangePercent(appearance.letterSpacing, appearanceSpacingRange.min, appearanceSpacingRange.max)"
                                             [value]="appearance.letterSpacing" (input)="setAppearanceLetterSpacing($any($event.target).valueAsNumber)">
                                         <small class="muted">+{{ appearanceSpacingRange.max }}</small>
                                     </label>
@@ -1652,6 +1666,12 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
         this.error = '';
         try { this.appearance.setFontSize(size); }
         catch { this.error = this.i18n.text('无法保存工作台字号。', 'Unable to save font size.'); }
+    }
+
+    rangePercent(value: number, min: number, max: number): string {
+        if (max <= min) return '0%';
+        const pct = Math.max(0, Math.min(100, ((value - min) * 100) / (max - min)));
+        return `${pct.toFixed(2)}%`;
     }
 
     formatLetterSpacing(spacing: number, auto = false): string {

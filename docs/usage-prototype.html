@@ -6,7 +6,7 @@
 <title>Tabby-OneAI-Workbench — 用量统计重新设计原型</title>
 <style>
   :root {
-    --font-sans: "Segoe UI Variable", "Segoe UI", "Noto Sans SC", "HarmonyOS Sans SC", "Sarasa UI SC", "MiSans", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif;
+    --font-sans: "Noto Sans SC", "Segoe UI Variable", "Segoe UI", "HarmonyOS Sans SC", "Sarasa UI SC", "MiSans", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif;
     --font-mono: "Cascadia Code", "Cascadia Mono", "JetBrainsMono Nerd Font", "JetBrains Mono", "Sarasa Mono SC", Consolas, monospace;
     --ui-spacing: 0px;
     --ui-word-spacing: 0px;
@@ -1261,7 +1261,7 @@
   <!-- 原型评审切换条（仅用于原型演示，正式插件中不包含） -->
   <div class="demo-bar" role="region" aria-label="原型预览控制条">
     <div class="demo-bar-group">
-      <span class="demo-tag">设计原型</span>
+      <span class="demo-tag">Tabby-OneAI-Workbench · 用量原型</span>
       <span class="demo-label">入口场景：</span>
       <button type="button" class="demo-pill active" data-preset="session-multi">会话 · 多模型</button>
       <button type="button" class="demo-pill" data-preset="session-single">会话 · 单模型</button>
@@ -1471,6 +1471,7 @@
     'claude-sonnet-4.5': '#fb923c',
     'claude-opus-4.1': '#f472b6',
     'gemini-2.5-pro': '#60a5fa',
+    'grok-3': '#c084fc',
     'kimi-k2-thinking': '#fbbf24',
   };
 
@@ -1530,7 +1531,7 @@
   const MOCK_PROJECTS = [
     {
       id: 'tabby-oneai',
-      name: 'TabbyOneAi',
+      name: 'Tabby-OneAI-Workbench',
       env: 'PowerShell 7',
       missingSessions: 1,
       sessions: [
@@ -1558,16 +1559,15 @@
         },
         {
           id: 'tabby-s2',
-          cli: 'Codex',
-          title: '优化左侧项目树按 CLI 分组与折叠',
-          updated: '11-16',
+          cli: 'GitHub Copilot',
+          title: '补齐 Copilot sessions 事件与用量解析',
+          updated: '11-20',
           entries: [
             ...seedHistory(0, [
-              { ago: 3, model: 'gpt-5.4-codex', input: 6800000, cached: 44100000, output: 1250000 },
-              { ago: 4, model: 'gpt-5.4-codex', input: 4200000, cached: 27900000, output: 820000 },
-              { ago: 6, model: 'gpt-5.3-codex-mini', input: 1900000, cached: 9400000, output: 410000 },
+              { ago: 1, model: 'claude-sonnet-4.5', input: 4100000, cached: 25600000, output: 790000 },
+              { ago: 2, model: 'gpt-5.4-codex', input: 2950000, cached: 16200000, output: 520000 },
             ]),
-            ...generateYearActivity(42, [['gpt-5.4-codex', 0.65], ['gpt-5.3-codex-mini', 0.25], ['o3', 0.1]], 36),
+            ...generateYearActivity(42, [['claude-sonnet-4.5', 0.65], ['gpt-5.4-codex', 0.35]], 30),
           ],
         },
         {
@@ -1586,7 +1586,7 @@
         {
           id: 'tabby-s4',
           cli: 'Kimi Code',
-          title: '核对 Kimi 新旧日志目录格式',
+          title: '核对 Kimi wire.jsonl 与旧版日志格式',
           updated: '11-04',
           entries: [
             ...seedHistory(0, [
@@ -1600,7 +1600,7 @@
     {
       id: 'know-video',
       name: 'KnowVideo',
-      env: 'WSL · Ubuntu',
+      env: 'WSL · Ubuntu-24.04',
       missingSessions: 2,
       sessions: [
         {
@@ -1619,6 +1619,18 @@
         },
         {
           id: 'kv-s2',
+          cli: 'Grok Build',
+          title: '排查导出管线编码与字幕对齐',
+          updated: '11-20',
+          entries: [
+            ...seedHistory(0, [
+              { ago: 1, model: 'grok-3', input: 3800000, cached: 21400000, output: 710000 },
+            ]),
+            ...generateYearActivity(288, [['grok-3', 1]], 20),
+          ],
+        },
+        {
+          id: 'kv-s3',
           cli: 'Pi',
           title: '梳理视频导出管线架构',
           updated: '11-18',
@@ -1631,7 +1643,7 @@
           ],
         },
         {
-          id: 'kv-s3',
+          id: 'kv-s4',
           cli: 'Codex',
           title: '复核动效与配音对齐逻辑',
           updated: '11-17',

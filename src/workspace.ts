@@ -147,9 +147,28 @@ export function terminalEditorActivity(screen: TerminalScreen): CodexActivity | 
             return 'working';
         } else if (border.test(line)) {
             if (workingIndicator.test(lineAt(row - 1))) return 'working';
-            return hasRecentErrorAbove(lineAt, row) ? 'error' : 'ready';
+            return hasRecentErrorAbove(lineAt, row) ? 'error' : hasActiveFooterTasks(screen) ? 'working' : 'ready';
         }
     }
+}
+
+export function hasActiveFooterTasks(screen?: TerminalScreen): boolean {
+    if (!screen?.buffer?.active) return false;
+    const buffer = screen.buffer.active;
+    const lineAt = (row: number) => buffer.getLine(buffer.baseY + row)?.translateToString(true).trim() ?? '';
+    const bottom = buffer.type === 'alternate' ? screen.rows - 1 : Math.min(screen.rows - 1, buffer.cursorY + 12);
+    const footerRows: string[] = [];
+    for (let row = bottom; row >= Math.max(0, bottom - 14); row--) {
+        const line = lineAt(row);
+        if (!line) continue;
+        if (/^[>›❯](?:\s|$)/.test(line)) break;
+        footerRows.push(line);
+        if (footerRows.length >= 10) break;
+    }
+    return footerRows.some(line =>
+        /(?:·|\s)[1-9]\d*\s+(?:task\(s\)|background\s+tasks?|local\s+agents?)(?:\s|$|·)/i.test(line)
+        || (/·\s*\/tasks\b/i.test(line) && /\b[1-9]\d*\b/.test(line))
+        || /^[\u2800-\u28ff●•·*▪■▫⬝◦]\s+(?:\[\d{2}:\d{2}:\d{2}\]\s+)?.*\s+(?:running|in progress)\s*$/i.test(line));
 }
 
 export function grokActivity(screen: TerminalScreen): CodexActivity | undefined {
@@ -368,6 +387,7 @@ export class WorkspaceService implements OnDestroy {
     private readonly bindings = new Map<string, { pane: Tab; events: Subscription }>();
     private readonly titleIds = new Map<string, string>();
     private readonly claudeTranscripts = new Map<string, string>();
+    private readonly agyMeterActivities = new Map<string, CodexActivity>();
     private readonly piLiveDetail = new Map<string, SessionDetails>();
     private readonly detailPending = new Set<string>();
     private readonly detailTime = new Map<string, number>();
@@ -934,11 +954,15 @@ export class WorkspaceService implements OnDestroy {
         dispose?: () => void,
     ): void {
         const received = subscribe(({ detail, activity, sessionId, transcript }) => this.zone.run(() => {
+            if (activity) this.agyMeterActivities.set(task.id, activity);
             const tokens = !sessionId || sessionId === task.cliSession?.id ? task.detail?.tokens : undefined;
             const hasError = activity === 'working' ? false : task.detail?.hasError;
             task.detail = { ...detail, tokens: detail.tokens ?? tokens, hasError };
-            const screenErr = activity === 'ready' && pane.frontend?.xterm && terminalEditorActivity(pane.frontend.xterm) === 'error';
-            this.setActivity(task, activity === 'ready' && (hasError || screenErr) ? 'error' : activity);
+            const screen = pane.frontend?.xterm;
+            const tasksRunning = activity !== 'waiting' && hasActiveFooterTasks(screen);
+            const screenErr = activity === 'ready' && screen && terminalEditorActivity(screen) === 'error';
+            const resolved = tasksRunning ? 'working' : activity === 'ready' && (hasError || screenErr) ? 'error' : activity;
+            this.setActivity(task, resolved);
             if (sessionId && transcript && this.claudeTranscripts.get(task.id) !== transcript) {
                 this.claudeTranscripts.set(task.id, transcript);
                 if (task.cliSession?.id !== sessionId) {
@@ -1139,7 +1163,13 @@ export class WorkspaceService implements OnDestroy {
                         throttleTimer = undefined;
                         lastRun = Date.now();
                         const activity = readActivity(screen);
-                        if (executable === 'agy' && task.detail?.quota && activity !== 'error') return;
+                        if (executable === 'agy' && task.detail?.quota) {
+                            const meterActivity = this.agyMeterActivities.get(task.id);
+                            const tasksRunning = meterActivity !== 'waiting' && hasActiveFooterTasks(screen);
+                            const resolved = tasksRunning ? 'working' : activity === 'error' ? 'error' : meterActivity;
+                            if (resolved && resolved !== task.activity) this.zone.run(() => this.setActivity(task, resolved));
+                            return;
+                        }
                         if (hasOscStatus && activity !== 'error' && !(executable === 'grok' && activity === 'waiting')) return;
                         if (activity && activity !== task.activity) this.zone.run(() => this.setActivity(task, activity));
                         if (executable === 'pi') {
@@ -1347,6 +1377,7 @@ export class WorkspaceService implements OnDestroy {
         this.bindings.delete(task.id);
         this.titleIds.delete(task.id);
         this.claudeTranscripts.delete(task.id);
+        this.agyMeterActivities.delete(task.id);
         this.piLiveDetail.delete(task.id);
         this.detailTime.delete(task.id);
     }
