@@ -1,0 +1,2922 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TabbyOneAi — 全量界面 UI 重新设计交互原型 v2</title>
+<style>
+  :root {
+    --font-sans: "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    --ui-size: 13px;
+    --radius-sm: 6px;
+    --radius-md: 9px;
+    --radius-lg: 13px;
+    --radius-pill: 999px;
+    --palette-canvas: #0d1117;
+    --palette-surface: #111821;
+    --palette-panel: #141d27;
+    --palette-elevated: #151e28;
+    --palette-muted: #1b2532;
+    --palette-control: #202d3b;
+    --palette-control-hover: #2c3d4f;
+    --palette-hover: #1c2836;
+    --palette-selected: #1c354a;
+    --palette-line: #253342;
+    --palette-line-strong: #354759;
+    --palette-fg: #e2e8f0;
+    --palette-fg-muted: #cbd5e1;
+    --palette-fg-subtle: #94a3b8;
+    --palette-fg-faint: #6c7d93;
+    --palette-accent: #38bdf8;
+    --palette-primary: #0284c7;
+    --palette-primary-hover: #0ea5e9;
+    --palette-success: #34d399;
+    --palette-warning: #fbbf24;
+    --palette-danger: #fb7185;
+    --palette-violet: #c084fc;
+    --tree-line: color-mix(in srgb, var(--palette-fg-subtle) 36%, transparent);
+    --shadow-dialog: 0 24px 68px rgba(0, 0, 0, 0.56), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-menu: 0 14px 36px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --heat-empty: rgba(148, 163, 184, 0.13);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    font-family: var(--font-sans);
+    font-size: var(--ui-size);
+    line-height: 1.45;
+    color: var(--palette-fg);
+    background: var(--palette-canvas);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--palette-fg-subtle) 35%, transparent); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--palette-fg-subtle) 55%, transparent); }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  .proto-shell {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--palette-canvas);
+  }
+
+  /* ===== 顶部原型视图切换器 ===== */
+  .proto-nav {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 14px;
+    background: color-mix(in srgb, var(--palette-panel) 94%, var(--palette-accent) 6%);
+    border-bottom: 1px solid var(--palette-line);
+    font-size: 12px;
+    z-index: 60;
+    overflow-x: auto;
+  }
+
+  .proto-nav-left, .proto-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  .proto-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--palette-accent) 16%, transparent);
+    color: var(--palette-accent);
+    font-weight: 700;
+    font-size: 11.5px;
+    margin-right: 4px;
+  }
+
+  .proto-btn {
+    border: 1px solid var(--palette-line);
+    background: var(--palette-control);
+    color: var(--palette-fg-muted);
+    padding: 4px 9px;
+    border-radius: 7px;
+    font: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.14s ease;
+  }
+
+  .proto-btn:hover {
+    background: var(--palette-control-hover);
+    color: var(--palette-fg);
+    border-color: var(--palette-line-strong);
+  }
+
+  .proto-btn.active {
+    background: var(--palette-selected);
+    border-color: color-mix(in srgb, var(--palette-accent) 60%, var(--palette-line));
+    color: var(--palette-accent);
+    font-weight: 600;
+  }
+
+  .proto-divider {
+    width: 1px;
+    height: 16px;
+    background: var(--palette-line);
+    margin: 0 3px;
+  }
+
+  /* ===== 全插件统一的状态视觉体系（颜色 + 形态严格一致） ===== */
+  /* 语义色变量：Running=绿，Ready=青蓝，Waiting=琥珀，Error=红，Exited=中性灰 */
+  .state-running { --state-color: var(--palette-success); }
+  .state-ready   { --state-color: var(--palette-accent); }
+  .state-waiting { --state-color: var(--palette-warning); }
+  .state-error   { --state-color: var(--palette-danger); }
+  .state-exited  { --state-color: var(--palette-fg-faint); }
+
+  /* 统一状态徽章：侧栏 CLI 分组 & 顶部状态栏 & 终端图例 100% 复用 */
+  .state-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 19px;
+    padding: 0 7px;
+    border-radius: var(--radius-pill);
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--state-color);
+    background: color-mix(in srgb, var(--state-color) 13%, transparent);
+    border: 1px solid color-mix(in srgb, var(--state-color) 32%, transparent);
+    white-space: nowrap;
+    flex: none;
+  }
+
+  /* 统一状态指示圆点 */
+  .state-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--state-color);
+    flex: none;
+  }
+
+  .state-running .state-dot,
+  .state-dot.state-running {
+    box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--palette-success) 24%, transparent);
+  }
+
+  /* 历史/已退出状态使用统一空心灰环，一眼区分在线与离线 */
+  .state-exited .state-dot,
+  .state-dot.state-exited {
+    background: transparent;
+    border: 1.5px solid color-mix(in srgb, var(--palette-fg-faint) 75%, transparent);
+    box-shadow: none;
+  }
+
+  /* 统一图标样式 */
+  .cli-svg {
+    width: 15px;
+    height: 15px;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cli-svg svg { width: 100%; height: 100%; display: block; }
+
+  /* ===== 统一自定义圆角下拉框（替代原生直角 <select>） ===== */
+  .cselect-trigger {
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 9px;
+    border: 1px solid var(--palette-line);
+    background: var(--palette-control);
+    color: var(--palette-fg);
+    font: inherit;
+    font-size: 12.5px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
+    min-width: 0;
+  }
+
+  .cselect-trigger:hover:not(:disabled) {
+    background: var(--palette-control-hover);
+    border-color: var(--palette-line-strong);
+  }
+
+  .cselect-trigger[aria-expanded="true"] {
+    border-color: var(--palette-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--palette-accent) 18%, transparent);
+  }
+
+  .cselect-trigger:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .cselect-value {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .cselect-value-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cselect-arrow {
+    color: var(--palette-fg-subtle);
+    display: flex;
+    flex: none;
+    transition: transform 0.16s ease;
+  }
+
+  .cselect-trigger[aria-expanded="true"] .cselect-arrow {
+    transform: rotate(180deg);
+    color: var(--palette-accent);
+  }
+
+  /* 全局悬浮圆角下拉菜单面板 */
+  .cselect-popover {
+    position: fixed;
+    z-index: 92;
+    min-width: 180px;
+    max-height: 272px;
+    overflow-y: auto;
+    padding: 5px;
+    border-radius: 11px;
+    background: var(--palette-surface);
+    border: 1px solid var(--palette-line-strong);
+    box-shadow: var(--shadow-menu);
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    animation: dropFade 0.12s ease-out;
+  }
+
+  .cselect-popover.open { display: flex; }
+
+  @keyframes dropFade {
+    from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .cselect-option {
+    width: 100%;
+    padding: 7px 9px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--palette-fg-muted);
+    font: inherit;
+    font-size: 12.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s ease, color 0.1s ease;
+  }
+
+  .cselect-option:hover {
+    background: var(--palette-hover);
+    color: var(--palette-fg);
+  }
+
+  .cselect-option.selected {
+    background: var(--palette-selected);
+    color: var(--palette-fg);
+    font-weight: 600;
+  }
+
+  .cselect-opt-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cselect-opt-meta {
+    font-size: 10.5px;
+    font-family: var(--font-mono);
+    color: var(--palette-fg-subtle);
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--palette-fg) 7%, transparent);
+    flex: none;
+  }
+
+  .cselect-opt-check {
+    color: var(--palette-accent);
+    width: 14px;
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+  }
+
+  /* ===== 模拟 Tabby 宿主桌面窗口 ===== */
+  .tabby-window {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    position: relative;
+    overflow: hidden;
+    background: var(--palette-canvas);
+  }
+
+  /* ===== 1. 左侧常驻项目侧栏（带清晰竖横树形连接线） ===== */
+  .sidebar {
+    width: 294px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    background: var(--palette-surface);
+    border-right: 1px solid var(--palette-line);
+    position: relative;
+    transition: width 0.18s ease;
+    user-select: none;
+    z-index: 5;
+  }
+
+  .sidebar.collapsed { width: 52px; }
+
+  .sidebar-header {
+    height: 74px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px 0 14px;
+    border-bottom: 1px solid var(--palette-line);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--palette-accent) 5%, var(--palette-panel)), var(--palette-surface));
+  }
+
+  .sidebar.collapsed .sidebar-header { justify-content: center; padding: 0; }
+  .sidebar.collapsed .brand-box, .sidebar.collapsed .sidebar-search { display: none; }
+
+  .brand-box { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+  .brand-logo {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--palette-accent) 22%, var(--palette-panel)), color-mix(in srgb, var(--palette-violet) 16%, var(--palette-panel)));
+    border: 1px solid color-mix(in srgb, var(--palette-accent) 32%, var(--palette-line));
+    color: var(--palette-accent);
+    flex: none;
+  }
+
+  .brand-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+  .brand-title-row { display: flex; align-items: center; gap: 6px; }
+  .brand-title-row strong { font-size: 14px; font-weight: 700; color: var(--palette-fg); }
+  .version-pill { font-family: var(--font-mono); font-size: 10px; padding: 1px 5px; border-radius: 5px; background: color-mix(in srgb, var(--palette-fg) 8%, transparent); color: var(--palette-fg-subtle); }
+  .brand-sub { font-size: 11px; color: var(--palette-fg-subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .icon-btn-sm {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--palette-fg-subtle);
+    display: inline-grid;
+    place-items: center;
+    cursor: pointer;
+    flex: none;
+  }
+  .icon-btn-sm:hover { background: var(--palette-hover); color: var(--palette-fg); border-color: var(--palette-line); }
+
+  .sidebar-search { padding: 9px 10px 4px; flex: none; }
+
+  .search-input-box {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 31px;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: var(--palette-panel);
+    border: 1px solid var(--palette-line);
+    color: var(--palette-fg-subtle);
+  }
+  .search-input-box:focus-within { border-color: var(--palette-accent); }
+  .search-input-box input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--palette-fg); font: inherit; font-size: 12px; }
+  .search-input-box input::placeholder { color: var(--palette-fg-faint); }
+
+  .sidebar-tree {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 6px 8px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .sidebar.collapsed .sidebar-tree { padding: 8px 6px; align-items: center; gap: 6px; }
+
+  .rail-item {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    background: var(--palette-panel);
+    color: var(--palette-accent);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    position: relative;
+  }
+  .rail-item:hover { background: var(--palette-hover); border-color: var(--palette-line-strong); }
+  .rail-item.has-active { background: var(--palette-selected); border-color: color-mix(in srgb, var(--palette-accent) 45%, var(--palette-line)); }
+  .rail-dot { position: absolute; right: 4px; bottom: 4px; }
+
+  /* 项目行 */
+  .project-block { display: flex; flex-direction: column; }
+
+  .project-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 7px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .project-header:hover { background: var(--palette-hover); }
+
+  .chevron { width: 14px; height: 14px; display: grid; place-items: center; color: var(--palette-fg-faint); flex: none; transition: transform 0.15s ease; }
+  .chevron.folded { transform: rotate(-90deg); }
+  .folder-icon { color: var(--palette-accent); flex: none; display: flex; }
+
+  .project-meta { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; }
+  .project-name { font-weight: 600; font-size: 13px; color: var(--palette-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .env-tag {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--palette-fg) 7%, transparent);
+    color: var(--palette-fg-subtle);
+  }
+  .env-tag.wsl { background: color-mix(in srgb, var(--palette-accent) 13%, transparent); color: var(--palette-accent); }
+
+  .branch-pill {
+    flex: none;
+    max-width: 72px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1.5px 6px;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--palette-violet);
+    background: color-mix(in srgb, var(--palette-violet) 11%, transparent);
+    border: 1px solid color-mix(in srgb, var(--palette-violet) 26%, transparent);
+  }
+  .branch-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .project-quick-add {
+    opacity: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 0;
+    background: transparent;
+    color: var(--palette-fg-subtle);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    flex: none;
+  }
+  .project-header:hover .project-quick-add { opacity: 1; }
+  .project-quick-add:hover { background: var(--palette-control-hover); color: var(--palette-accent); }
+
+  /* ===== 核心：清晰「项目 竖横→ 模型(CLI) 竖横→ 会话」树形折线 ===== */
+  .tree-branch-list {
+    list-style: none;
+    margin: 0;
+    padding: 2px 0 0 0;
+  }
+
+  /* 一级容器：从项目文件夹中心下方引出 */
+  .project-tree-children {
+    margin-left: 16px;
+    padding-left: 14px;
+  }
+
+  /* 二级容器：从模型/CLI 图标中心下方引出 */
+  .cli-tree-children {
+    margin-left: 14px;
+    padding-left: 14px;
+    padding-top: 2px;
+    padding-bottom: 3px;
+  }
+
+  .tree-node {
+    position: relative;
+    --elbow-y: 14px;
+  }
+
+  /* 竖线：贯通兄弟节点，最后一项在拐点处停住并由 L 形弧线收尾 */
+  .tree-node::before {
+    content: "";
+    position: absolute;
+    left: -14px;
+    top: 0;
+    bottom: 0;
+    width: 1.25px;
+    background: var(--tree-line);
+    pointer-events: none;
+  }
+
+  /* 横线（非最后一项：直角 T 形分支） */
+  .tree-node::after {
+    content: "";
+    position: absolute;
+    left: -14px;
+    top: var(--elbow-y);
+    width: 12px;
+    height: 1.25px;
+    background: var(--tree-line);
+    pointer-events: none;
+  }
+
+  /* 最后一项：圆角 L 形优雅收口 (╰─) */
+  .tree-node:last-child::before {
+    bottom: auto;
+    height: calc(var(--elbow-y) + 1px);
+    width: 12px;
+    background: transparent;
+    border-left: 1.25px solid var(--tree-line);
+    border-bottom: 1.25px solid var(--tree-line);
+    border-bottom-left-radius: 6px;
+  }
+
+  .tree-node:last-child::after {
+    display: none;
+  }
+
+  /* CLI（模型分组）行 */
+  .cli-group-head {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 28px;
+    padding: 0 7px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 12.2px;
+    color: var(--palette-fg-muted);
+    transition: background 0.12s ease;
+  }
+  .cli-group-head:hover { background: var(--palette-hover); }
+  .cli-group-name { font-weight: 600; color: var(--palette-fg); }
+
+  /* 会话叶节点 */
+  .session-node {
+    --elbow-y: 15px;
+    margin-bottom: 2px;
+  }
+
+  .session-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 30px;
+    padding: 4px 7px;
+    border-radius: 7px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.12s ease;
+    position: relative;
+  }
+  .session-row:hover { background: var(--palette-hover); }
+
+  .session-row.active {
+    background: var(--palette-selected);
+    border-color: color-mix(in srgb, var(--palette-accent) 38%, transparent);
+  }
+
+  .session-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 12.2px;
+    color: var(--palette-fg-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .session-row.opened .session-title { color: var(--palette-fg); font-weight: 500; }
+  .session-row.active .session-title { color: var(--palette-accent); font-weight: 600; }
+
+  /* 未读提示：统一克制的琥珀微标，不把文字整行染黄 */
+  .unread-pip {
+    font-size: 9.5px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: var(--radius-pill);
+    color: var(--palette-warning);
+    background: color-mix(in srgb, var(--palette-warning) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--palette-warning) 32%, transparent);
+    flex: none;
+  }
+
+  .session-time { font-size: 11px; color: var(--palette-fg-faint); font-variant-numeric: tabular-nums; flex: none; }
+  .session-row:hover .session-time, .session-row:hover .unread-pip { display: none; }
+
+  .session-hover-actions { display: none; align-items: center; gap: 2px; flex: none; }
+  .session-row:hover .session-hover-actions { display: inline-flex; }
+
+  .tiny-action {
+    width: 21px;
+    height: 21px;
+    border-radius: 5px;
+    border: 0;
+    background: transparent;
+    color: var(--palette-fg-subtle);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .tiny-action:hover { background: var(--palette-control-hover); color: var(--palette-accent); }
+
+  .more-node { --elbow-y: 12px; }
+  .tree-more-btn {
+    padding: 3px 8px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--palette-accent);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    opacity: 0.86;
+  }
+  .tree-more-btn:hover { opacity: 1; background: color-mix(in srgb, var(--palette-accent) 12%, transparent); }
+
+  /* 侧栏底部 */
+  .sidebar-footer {
+    flex: none;
+    padding: 10px;
+    border-top: 1px solid var(--palette-line);
+    background: var(--palette-panel);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .sidebar.collapsed .sidebar-footer { flex-direction: column; padding: 8px 6px; }
+
+  .btn-add-project {
+    flex: 1;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid color-mix(in srgb, var(--palette-accent) 36%, var(--palette-line));
+    background: color-mix(in srgb, var(--palette-accent) 14%, var(--palette-control));
+    color: var(--palette-accent);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    cursor: pointer;
+  }
+  .btn-add-project:hover { background: color-mix(in srgb, var(--palette-accent) 22%, var(--palette-control)); }
+  .sidebar.collapsed .btn-add-project { flex: none; width: 36px; height: 36px; padding: 0; }
+  .sidebar.collapsed .btn-add-project span { display: none; }
+
+  .btn-settings {
+    width: 34px;
+    height: 34px;
+    flex: none;
+    border-radius: 9px;
+    border: 1px solid var(--palette-line);
+    background: var(--palette-control);
+    color: var(--palette-fg-muted);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .sidebar.collapsed .btn-settings { width: 36px; height: 36px; }
+  .btn-settings:hover { background: var(--palette-control-hover); color: var(--palette-fg); border-color: var(--palette-line-strong); }
+
+  /* ===== 2. 右侧主区域 ===== */
+  .main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; background: var(--palette-canvas); }
+
+  .tabby-tabs {
+    height: 36px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    background: var(--palette-panel);
+    border-bottom: 1px solid var(--palette-line);
+    user-select: none;
+  }
+
+  .native-tab {
+    height: 28px;
+    padding: 0 11px;
+    border-radius: 7px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--palette-fg-subtle);
+    position: relative;
+    cursor: pointer;
+    max-width: 240px;
+  }
+  .native-tab:hover { background: var(--palette-hover); color: var(--palette-fg-muted); }
+  .native-tab.active { background: var(--palette-surface); color: var(--palette-fg); font-weight: 500; }
+  .native-tab.active::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 2px; border-radius: 99px; background: var(--state-color, var(--palette-accent)); }
+  .native-tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .window-controls { margin-left: auto; display: flex; align-items: center; gap: 12px; color: var(--palette-fg-faint); font-size: 12px; padding-right: 4px; }
+
+  /* 顶部任务状态栏 */
+  .status-bar {
+    height: 40px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 0 12px;
+    background: var(--palette-surface);
+    border-bottom: 1px solid var(--palette-line);
+    min-width: 0;
+  }
+
+  .status-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .status-cli-chip { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12.5px; color: var(--palette-fg); flex: none; }
+  .status-session-name { font-weight: 600; font-size: 12.5px; color: var(--palette-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .origin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 7px;
+    background: var(--palette-panel);
+    border: 1px solid var(--palette-line);
+    font-size: 11.5px;
+    color: var(--palette-fg-subtle);
+    flex: none;
+  }
+  .origin-chip .sep { opacity: 0.4; }
+  .origin-chip .env { color: var(--palette-fg-muted); font-family: var(--font-mono); font-size: 10.5px; }
+  .origin-chip .env.wsl { color: var(--palette-accent); }
+
+  .status-right { display: flex; align-items: center; gap: 6px; flex: none; }
+
+  .metric-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 9px;
+    border-radius: 7px;
+    background: var(--palette-panel);
+    border: 1px solid var(--palette-line);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--palette-fg);
+  }
+  .metric-pill.clickable { cursor: pointer; }
+  .metric-pill.clickable:hover { border-color: color-mix(in srgb, var(--palette-accent) 55%, var(--palette-line)); background: var(--palette-hover); }
+
+  .metric-k { color: var(--palette-fg-faint); font-size: 10.5px; }
+  .metric-v { font-weight: 600; color: var(--palette-fg); }
+  .metric-v.purple { color: var(--palette-violet); }
+  .metric-v.accent { color: var(--palette-accent); }
+  .metric-v.good { color: var(--palette-success); }
+  .metric-v.warn { color: var(--palette-warning); }
+  .metric-v.bad { color: var(--palette-danger); }
+  .metric-sub { color: var(--palette-fg-faint); font-size: 10.5px; }
+
+  .mini-bar { width: 28px; height: 4px; border-radius: 99px; background: color-mix(in srgb, var(--palette-fg) 12%, transparent); overflow: hidden; }
+  .mini-bar-fill { height: 100%; border-radius: 99px; }
+
+  .status-actions { display: inline-flex; align-items: center; gap: 3px; padding-left: 6px; border-left: 1px solid var(--palette-line); }
+  .status-action-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--palette-accent);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .status-action-btn:hover, .status-action-btn.active {
+    background: var(--palette-selected);
+    border-color: color-mix(in srgb, var(--palette-accent) 42%, var(--palette-line));
+  }
+
+  /* 终端模拟区 + 状态规范一览 */
+  .terminal-body {
+    flex: 1;
+    min-height: 0;
+    padding: 16px 20px;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--palette-fg-muted);
+    background: var(--palette-canvas);
+  }
+  .term-prompt { display: inline-block; padding: 2px 9px; border-radius: 6px; background: color-mix(in srgb, var(--palette-fg) 6%, transparent); color: var(--palette-fg); margin-bottom: 10px; }
+  .term-note { color: var(--palette-fg-subtle); margin: 5px 0; }
+  .term-accent { color: var(--palette-accent); }
+
+  .spec-card {
+    margin-top: 16px;
+    padding: 13px 15px;
+    border-radius: 10px;
+    border: 1px solid var(--palette-line);
+    background: var(--palette-surface);
+    font-family: var(--font-sans);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .spec-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .spec-label { font-size: 12px; font-weight: 600; color: var(--palette-fg); }
+
+  /* ===== 遮罩与通用弹窗 ===== */
+  .overlay-backdrop {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--palette-canvas) 66%, transparent);
+    backdrop-filter: blur(3px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+    padding: 18px;
+  }
+  .overlay-backdrop.open { display: flex; }
+
+  .modal-card {
+    background: var(--palette-surface);
+    border: 1px solid var(--palette-line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-dialog);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-width: 100%;
+    max-height: 100%;
+    animation: popIn 0.14s ease-out;
+  }
+  @keyframes popIn { from { opacity: 0; transform: translateY(6px) scale(0.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+  .modal-header {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--palette-line);
+    background: var(--palette-panel);
+  }
+  .modal-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .modal-icon { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: color-mix(in srgb, var(--palette-accent) 14%, transparent); color: var(--palette-accent); flex: none; }
+  .modal-header h2 { margin: 0; font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+  .modal-header-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+
+  .ui-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 31px;
+    padding: 0 11px;
+    border-radius: 8px;
+    border: 1px solid var(--palette-line);
+    background: var(--palette-control);
+    color: var(--palette-fg-muted);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.14s ease;
+  }
+  .ui-btn:hover { background: var(--palette-control-hover); color: var(--palette-fg); border-color: var(--palette-line-strong); }
+  .ui-btn.primary { background: color-mix(in srgb, var(--palette-accent) 18%, var(--palette-control)); border-color: color-mix(in srgb, var(--palette-accent) 50%, var(--palette-line)); color: var(--palette-accent); font-weight: 600; }
+  .ui-btn.primary:hover { background: color-mix(in srgb, var(--palette-accent) 26%, var(--palette-control)); }
+  .ui-btn.ghost { border-color: transparent; background: transparent; }
+  .ui-btn.ghost:hover { background: var(--palette-hover); }
+  .ui-btn.icon-only { width: 30px; padding: 0; font-size: 18px; line-height: 1; }
+
+  .ui-input {
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 9px;
+    border: 1px solid var(--palette-line);
+    background: var(--palette-control);
+    color: var(--palette-fg);
+    font: inherit;
+    font-size: 12.5px;
+  }
+  .ui-input:focus-visible { outline: 2px solid var(--palette-accent); outline-offset: -1px; }
+
+  /* ===== 3. 用量统计弹窗（加大尺寸，一屏完整展示不裁切） ===== */
+  .usage-modal { width: min(1100px, calc(100vw - 28px)); height: min(800px, calc(100dvh - 54px)); }
+
+  .model-summary-pills {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .model-brief-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--palette-panel);
+    border: 1px solid var(--palette-line);
+    font-size: 11px;
+    color: var(--palette-fg-muted);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: all 0.13s ease;
+  }
+
+  .model-brief-chip:hover {
+    border-color: var(--palette-line-strong);
+    background: var(--palette-hover);
+    color: var(--palette-fg);
+  }
+
+  .model-brief-chip.active {
+    background: var(--palette-selected);
+    border-color: var(--palette-accent);
+    color: var(--palette-fg);
+  }
+
+  .model-brief-chip b {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--palette-fg);
+  }
+
+  .model-brief-chip .pct {
+    color: var(--palette-fg-subtle);
+  }
+
+  .header-breadcrumb { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--palette-fg-subtle); min-width: 0; overflow: hidden; white-space: nowrap; }
+  .header-breadcrumb .sep { opacity: 0.45; }
+  .header-breadcrumb .curr { color: var(--palette-fg-muted); overflow: hidden; text-overflow: ellipsis; }
+
+  .usage-filter-bar {
+    flex: none;
+    display: grid;
+    grid-template-columns: minmax(170px, 1fr) 16px minmax(230px, 1.45fr) 16px minmax(170px, 1fr);
+    align-items: end;
+    gap: 6px;
+    padding: 11px 18px;
+    border-bottom: 1px solid var(--palette-line);
+    background: color-mix(in srgb, var(--palette-panel) 55%, var(--palette-surface));
+  }
+
+  .filter-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .filter-label-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .filter-label { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--palette-fg-subtle); }
+  .filter-badge { font-size: 10px; padding: 1px 6px; border-radius: var(--radius-pill); background: color-mix(in srgb, var(--palette-accent) 14%, transparent); color: var(--palette-accent); white-space: nowrap; }
+  .filter-badge.neutral { background: color-mix(in srgb, var(--palette-fg) 8%, transparent); color: var(--palette-fg-subtle); }
+  .cascade-arrow { height: 34px; display: grid; place-items: center; color: var(--palette-fg-faint); }
+
+  .usage-body { flex: 1; min-height: 0; overflow-y: auto; padding: 13px 18px 15px; display: flex; flex-direction: column; gap: 11px; }
+  .period-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+  .segmented { display: inline-flex; padding: 3px; border-radius: 9px; background: var(--palette-panel); border: 1px solid var(--palette-line); gap: 2px; }
+  .segmented button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--palette-fg-subtle); font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; }
+  .segmented button:hover { color: var(--palette-fg); }
+  .segmented button[aria-pressed="true"] { background: var(--palette-selected); border-color: color-mix(in srgb, var(--palette-accent) 42%, transparent); color: var(--palette-fg); font-weight: 600; }
+  .seg-val { font-family: var(--font-mono); font-size: 10.5px; font-variant-numeric: tabular-nums; padding: 1px 5px; border-radius: 4px; background: color-mix(in srgb, var(--palette-fg) 8%, transparent); color: var(--palette-fg-muted); }
+  .segmented button[aria-pressed="true"] .seg-val { background: color-mix(in srgb, var(--palette-accent) 22%, transparent); color: var(--palette-accent); }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+  .kpi-card { padding: 11px 13px; border-radius: var(--radius-md); border: 1px solid var(--palette-line); background: var(--palette-elevated); display: flex; flex-direction: column; gap: 3px; }
+  .kpi-card.primary { background: linear-gradient(145deg, color-mix(in srgb, var(--palette-accent) 12%, var(--palette-elevated)), var(--palette-elevated) 68%); border-color: color-mix(in srgb, var(--palette-accent) 34%, var(--palette-line)); }
+  .kpi-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--palette-fg-subtle); }
+  .kpi-value { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .kpi-card.primary .kpi-value { color: var(--palette-accent); }
+  .kpi-sub { font-size: 11px; color: var(--palette-fg-subtle); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .panel-card { border: 1px solid var(--palette-line); border-radius: var(--radius-md); background: var(--palette-elevated); padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .card-head-left { display: flex; align-items: baseline; gap: 8px; }
+  .card-title { margin: 0; font-size: 12.5px; font-weight: 600; }
+  .card-sub { font-size: 11px; color: var(--palette-fg-subtle); font-variant-numeric: tabular-nums; }
+
+  .heatmap-scroll { overflow-x: auto; padding-bottom: 2px; }
+  .heatmap-grid { display: flex; align-items: flex-end; gap: 3px; width: max-content; --cell: 10.5px; --gap: 3px; }
+  .heatmap-weekdays { display: grid; grid-template-rows: 15px repeat(7, var(--cell)); gap: var(--gap); padding-right: 6px; position: sticky; left: 0; background: var(--palette-elevated); z-index: 1; }
+  .heatmap-weekdays span { font-size: 10px; line-height: var(--cell); color: var(--palette-fg-faint); }
+  .heatmap-week { display: grid; grid-template-rows: 15px repeat(7, var(--cell)); gap: var(--gap); width: var(--cell); }
+  .heatmap-month { font-size: 10px; line-height: 15px; color: var(--palette-fg-subtle); white-space: nowrap; }
+  .heat-cell { width: var(--cell); height: var(--cell); border-radius: 2.5px; background: var(--heat-empty); cursor: pointer; }
+  .heat-cell:hover { transform: scale(1.22); outline: 1.5px solid var(--palette-fg); position: relative; z-index: 2; }
+  .heat-cell[data-level="1"] { background: color-mix(in srgb, var(--palette-success) 28%, transparent); }
+  .heat-cell[data-level="2"] { background: color-mix(in srgb, var(--palette-success) 50%, transparent); }
+  .heat-cell[data-level="3"] { background: color-mix(in srgb, var(--palette-success) 74%, transparent); }
+  .heat-cell[data-level="4"] { background: var(--palette-success); }
+  .heat-legend { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; color: var(--palette-fg-subtle); }
+  .heat-legend .heat-cell { width: 9px; height: 9px; cursor: default; }
+  .heat-legend .heat-cell:hover { transform: none; outline: none; }
+
+  .bar-chart { display: grid; align-items: end; gap: 6px; height: 112px; padding-top: 14px; }
+  .bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; min-width: 0; cursor: pointer; }
+  .bar-track { flex: 1; width: 100%; max-width: 34px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: 5px; background: color-mix(in srgb, var(--palette-fg) 4%, transparent); overflow: hidden; }
+  .bar-fill { width: 100%; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, var(--palette-success), color-mix(in srgb, var(--palette-accent) 68%, var(--palette-success))); }
+  .bar-val { font-size: 10px; color: var(--palette-fg-subtle); font-variant-numeric: tabular-nums; height: 13px; }
+  .bar-label { font-size: 10px; color: var(--palette-fg-subtle); white-space: nowrap; }
+
+  .stacked-bar { height: 10px; border-radius: 99px; overflow: hidden; display: flex; gap: 2px; background: var(--heat-empty); padding: 1px; }
+  .stacked-seg { height: 100%; border-radius: 99px; cursor: pointer; transition: filter 0.14s ease, transform 0.14s ease; }
+  .stacked-seg:hover { filter: brightness(1.18); transform: scaleY(1.15); }
+  .seg-input { background: var(--palette-accent); }
+  .seg-cached { background: var(--palette-success); }
+  .seg-output { background: var(--palette-violet); }
+  .comp-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11.5px; color: var(--palette-fg-muted); font-variant-numeric: tabular-nums; }
+  .comp-item { display: inline-flex; align-items: center; gap: 5px; padding: 2px 6px; border-radius: 6px; cursor: pointer; transition: background 0.12s ease; }
+  .comp-item:hover { background: var(--palette-hover); color: var(--palette-fg); }
+  .comp-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+  .usage-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .usage-table th { padding: 5px 7px 7px; font-size: 11px; color: var(--palette-fg-subtle); text-align: right; border-bottom: 1px solid var(--palette-line); }
+  .usage-table th:first-child { text-align: left; padding-left: 4px; }
+  .usage-table tbody tr { cursor: pointer; }
+  .usage-table tbody tr:hover { background: var(--palette-hover); }
+  .usage-table tbody tr.active-row { background: var(--palette-selected); }
+  .usage-table td { padding: 7px 7px; border-bottom: 1px solid color-mix(in srgb, var(--palette-line) 65%, transparent); text-align: right; font-variant-numeric: tabular-nums; color: var(--palette-fg-muted); }
+  .usage-table tbody tr:last-child td { border-bottom: 0; }
+  .usage-table td:first-child { text-align: left; padding-left: 4px; }
+  .model-name { font-family: var(--font-mono); font-size: 11.8px; font-weight: 600; color: var(--palette-fg); }
+  .share-bar { height: 3px; width: 110px; border-radius: 99px; background: var(--heat-empty); overflow: hidden; margin-top: 3px; }
+  .share-fill { height: 100%; border-radius: 99px; }
+
+  .modal-footer {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 9px 18px;
+    border-top: 1px solid var(--palette-line);
+    background: var(--palette-panel);
+    font-size: 11.5px;
+    color: var(--palette-fg-subtle);
+  }
+  .disclaimer { display: flex; align-items: center; gap: 6px; }
+  .disclaimer svg { color: var(--palette-warning); flex: none; }
+
+  /* ===== 4. 历史提示词右侧抽屉 ===== */
+  .history-backdrop {
+    position: absolute;
+    inset: 36px 0 0 0;
+    background: color-mix(in srgb, var(--palette-canvas) 45%, transparent);
+    display: none;
+    justify-content: flex-end;
+    z-index: 28;
+    padding: 8px 10px 10px;
+  }
+  .history-backdrop.open { display: flex; }
+
+  .history-drawer {
+    width: min(500px, 100%);
+    height: 100%;
+    background: var(--palette-surface);
+    border: 1px solid var(--palette-line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-dialog);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideInRight 0.16s ease-out;
+  }
+  @keyframes slideInRight { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
+
+  .history-toolbar { flex: none; padding: 10px 14px; border-bottom: 1px solid var(--palette-line); display: flex; align-items: center; gap: 8px; background: color-mix(in srgb, var(--palette-panel) 50%, var(--palette-surface)); }
+  .history-list { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .prompt-card { border: 1px solid var(--palette-line); border-radius: var(--radius-md); background: var(--palette-elevated); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .prompt-card:hover { border-color: var(--palette-line-strong); }
+  .prompt-meta { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--palette-fg-subtle); }
+  .prompt-index { font-family: var(--font-mono); font-weight: 600; color: var(--palette-accent); background: color-mix(in srgb, var(--palette-accent) 13%, transparent); padding: 1px 6px; border-radius: 5px; }
+  .prompt-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; line-height: 1.55; color: var(--palette-fg); }
+  .prompt-body.clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+  .prompt-foot { display: flex; align-items: center; justify-content: space-between; }
+  .text-link-btn { border: 0; background: transparent; color: var(--palette-accent); font: inherit; font-size: 11.5px; padding: 2px 5px; border-radius: 5px; cursor: pointer; }
+  .text-link-btn:hover { background: color-mix(in srgb, var(--palette-accent) 12%, transparent); }
+
+  /* ===== 5. 工作台设置弹窗 ===== */
+  .settings-modal { width: min(860px, 100%); height: min(620px, 100%); }
+  .settings-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 186px minmax(0, 1fr); }
+  .settings-nav { border-right: 1px solid var(--palette-line); background: var(--palette-panel); padding: 12px 10px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+  .settings-nav-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--palette-fg-muted); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+  .settings-nav-item:hover { background: var(--palette-hover); color: var(--palette-fg); }
+  .settings-nav-item.active { background: var(--palette-selected); border-color: color-mix(in srgb, var(--palette-accent) 38%, transparent); color: var(--palette-accent); font-weight: 600; }
+  .settings-nav-badge { margin-left: auto; font-size: 10.5px; font-family: var(--font-mono); padding: 0 5px; border-radius: 99px; background: color-mix(in srgb, var(--palette-fg) 9%, transparent); color: var(--palette-fg-subtle); }
+
+  .settings-content { min-width: 0; min-height: 0; overflow-y: auto; padding: 18px 20px 22px; display: flex; flex-direction: column; gap: 15px; }
+  .settings-section-title { margin: 0 0 2px; font-size: 15px; font-weight: 600; }
+  .settings-section-desc { margin: 0; font-size: 12px; color: var(--palette-fg-subtle); }
+  .setting-group-card { border: 1px solid var(--palette-line); border-radius: var(--radius-md); background: var(--palette-elevated); padding: 14px 15px; display: flex; flex-direction: column; gap: 12px; }
+  .setting-group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .setting-group-head strong { font-size: 12.5px; }
+  .setting-group-head small { font-size: 11.5px; color: var(--palette-fg-subtle); }
+
+  .typography-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; align-items: start; }
+  .slider-box { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .slider-box input[type="range"] { flex: 1; accent-color: var(--palette-accent); cursor: pointer; }
+  .size-pill { font-family: var(--font-mono); font-size: 11.5px; padding: 2px 7px; border-radius: 6px; background: var(--palette-control); border: 1px solid var(--palette-line); color: var(--palette-accent); font-weight: 600; min-width: 48px; text-align: center; }
+
+  .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 8px; }
+  .theme-card { display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--palette-line); background: var(--palette-control); color: var(--palette-fg-muted); font: inherit; font-size: 12px; text-align: left; cursor: pointer; min-width: 0; }
+  .theme-card:hover { background: var(--palette-control-hover); border-color: var(--palette-line-strong); color: var(--palette-fg); }
+  .theme-card.active { background: var(--palette-selected); border-color: var(--palette-accent); color: var(--palette-fg); font-weight: 600; box-shadow: 0 0 0 1px color-mix(in srgb, var(--palette-accent) 30%, transparent); }
+  .theme-swatch { width: 22px; height: 16px; border-radius: 5px; border: 1px solid rgba(128,128,128,0.35); display: flex; overflow: hidden; flex: none; }
+  .theme-swatch i { flex: 1; display: block; }
+  .theme-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .font-picker-box { position: relative; }
+  .font-dropdown { position: absolute; left: 0; right: 0; top: calc(100% + 5px); background: var(--palette-surface); border: 1px solid var(--palette-line-strong); border-radius: 11px; box-shadow: var(--shadow-menu); padding: 6px; z-index: 20; display: none; flex-direction: column; gap: 6px; }
+  .font-dropdown.open { display: flex; }
+  .font-options { max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .font-opt { border: 0; background: transparent; color: var(--palette-fg-muted); padding: 6px 8px; border-radius: 7px; text-align: left; font: inherit; font-size: 12px; cursor: pointer; }
+  .font-opt:hover { background: var(--palette-hover); color: var(--palette-fg); }
+  .font-opt.active { background: var(--palette-selected); color: var(--palette-accent); font-weight: 600; }
+
+  .list-card { border: 1px solid var(--palette-line); border-radius: var(--radius-md); background: var(--palette-elevated); overflow: hidden; }
+  .list-row { padding: 11px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .list-row + .list-row { border-top: 1px solid var(--palette-line); }
+  .dir-row { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .dir-row + .dir-row { border-top: 1px solid var(--palette-line); }
+  .dir-row-top, .dir-row-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+
+  .code-path { font-family: var(--font-mono); font-size: 11.5px; color: var(--palette-fg-muted); background: color-mix(in srgb, var(--palette-fg) 5%, transparent); padding: 2px 7px; border-radius: 6px; user-select: text; overflow-wrap: anywhere; }
+  .env-var-code { font-family: var(--font-mono); font-size: 11px; color: var(--palette-accent); background: color-mix(in srgb, var(--palette-accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--palette-accent) 28%, transparent); padding: 1.5px 6px; border-radius: 6px; }
+
+  .cli-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .cli-detect-card { padding: 11px 13px; border-radius: var(--radius-md); border: 1px solid var(--palette-line); background: var(--palette-elevated); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .cli-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .cli-id strong { display: block; font-size: 13px; }
+  .cli-id code { font-family: var(--font-mono); font-size: 11px; color: var(--palette-fg-subtle); }
+
+  .kbd-chip { font-family: var(--font-mono); font-size: 11.5px; padding: 3px 8px; border-radius: 6px; background: var(--palette-control); border: 1px solid var(--palette-line-strong); color: var(--palette-fg); }
+  .kbd-chip.empty { border-style: dashed; border-color: var(--palette-line); background: transparent; color: var(--palette-fg-faint); }
+
+  /* 6. 小弹窗 & 菜单集 */
+  .showcase-modal { width: min(860px, 100%); height: min(590px, 100%); }
+  .showcase-grid { padding: 16px 18px; overflow-y: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .showcase-box { border: 1px solid var(--palette-line); border-radius: var(--radius-md); background: var(--palette-elevated); overflow: hidden; display: flex; flex-direction: column; }
+  .showcase-box-head { padding: 9px 13px; border-bottom: 1px solid var(--palette-line); background: var(--palette-panel); font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; }
+  .form-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 11px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 12px; font-weight: 600; color: var(--palette-fg-muted); }
+  .form-hint { font-size: 11px; color: var(--palette-fg-subtle); }
+  .form-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px; }
+
+  /* 右键菜单 */
+  .ctx-menu { position: fixed; min-width: 224px; padding: 5px; border-radius: 11px; background: var(--palette-surface); border: 1px solid var(--palette-line-strong); box-shadow: var(--shadow-menu); z-index: 80; display: none; flex-direction: column; gap: 2px; }
+  .ctx-menu.open { display: flex; }
+  .ctx-section-title { padding: 4px 9px 3px; font-size: 10.5px; font-weight: 600; color: var(--palette-fg-faint); }
+  .ctx-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border: 0; border-radius: 7px; background: transparent; color: var(--palette-fg-muted); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+  .ctx-item:hover { background: var(--palette-hover); color: var(--palette-fg); }
+  .ctx-item.danger:hover { background: color-mix(in srgb, var(--palette-danger) 14%, transparent); color: var(--palette-danger); }
+  .ctx-item-right { margin-left: auto; font-size: 11px; color: var(--palette-accent); }
+  .ctx-sep { height: 1px; background: var(--palette-line); margin: 3px 4px; }
+
+  .floating-tip { position: fixed; pointer-events: none; z-index: 95; padding: 8px 10px; border-radius: 9px; background: var(--palette-panel); border: 1px solid var(--palette-line-strong); box-shadow: var(--shadow-menu); font-size: 11.5px; color: var(--palette-fg); opacity: 0; transition: opacity 0.1s ease; min-width: 152px; font-variant-numeric: tabular-nums; }
+  .floating-tip.visible { opacity: 1; }
+
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(10px); padding: 7px 14px; border-radius: 99px; background: var(--palette-panel); border: 1px solid color-mix(in srgb, var(--palette-accent) 45%, var(--palette-line)); color: var(--palette-fg); font-size: 12px; box-shadow: var(--shadow-menu); opacity: 0; pointer-events: none; transition: all 0.18s ease; z-index: 99; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 900px) {
+    .usage-filter-bar { grid-template-columns: 1fr; }
+    .cascade-arrow { display: none; }
+    .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .settings-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .settings-nav { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--palette-line); }
+    .typography-grid, .cli-grid, .showcase-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="proto-shell">
+  <!-- 顶部原型导航条 -->
+  <nav class="proto-nav" aria-label="原型页面导航">
+    <div class="proto-nav-left">
+      <span class="proto-badge">TabbyOneAi 全量 UI 原型 v2</span>
+      <button class="proto-btn active" data-view="workbench">主工作台</button>
+      <button class="proto-btn" data-view="rail">侧栏折叠态</button>
+      <div class="proto-divider"></div>
+      <button class="proto-btn" data-view="usage">用量统计</button>
+      <button class="proto-btn" data-view="history">历史提示词抽屉</button>
+      <div class="proto-divider"></div>
+      <button class="proto-btn" data-view="settings:appearance">设置 · 外观</button>
+      <button class="proto-btn" data-view="settings:directories">设置 · CLI 目录</button>
+      <button class="proto-btn" data-view="settings:cli">设置 · CLI 检测</button>
+      <button class="proto-btn" data-view="settings:sessions">设置 · 会话管理</button>
+      <button class="proto-btn" data-view="settings:shortcuts">设置 · 快捷键</button>
+      <div class="proto-divider"></div>
+      <button class="proto-btn" data-view="modals">小弹窗 &amp; 菜单集</button>
+    </div>
+    <div class="proto-nav-right">
+      <button class="proto-btn" id="quickThemeToggle">切换浅色 / 深色</button>
+    </div>
+  </nav>
+
+  <div class="tabby-window">
+    <!-- 1. 左侧常驻项目侧栏 -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-box">
+          <div class="brand-logo" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          </div>
+          <div class="brand-text">
+            <div class="brand-title-row">
+              <strong>AI 工作台</strong>
+              <span class="version-pill">v0.3.0</span>
+            </div>
+            <span class="brand-sub">Windows 与 WSL 项目会话</span>
+          </div>
+        </div>
+        <button class="icon-btn-sm" id="collapseSidebarBtn" title="折叠 / 展开侧栏" aria-label="折叠侧栏">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+      </div>
+
+      <div class="sidebar-search">
+        <div class="search-input-box">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="treeSearchInput" placeholder="筛选项目、CLI 或会话…" aria-label="筛选项目、CLI 或会话">
+        </div>
+      </div>
+
+      <div class="sidebar-tree" id="sidebarTree"></div>
+
+      <div class="sidebar-footer">
+        <button class="btn-add-project" id="addProjectBtn" title="添加项目">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+          <span>添加项目</span>
+        </button>
+        <button class="btn-settings" id="openSettingsBtn" title="工作台设置" aria-label="工作台设置">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 2. 右侧主区域 -->
+    <main class="main-area">
+      <div class="tabby-tabs">
+        <div class="native-tab"><span class="native-tab-title">1  Welcome</span></div>
+        <div class="native-tab active" id="activeNativeTab"></div>
+        <div class="native-tab" title="新建标签">+</div>
+        <div class="window-controls" aria-hidden="true"><span>─</span><span>□</span><span>×</span></div>
+      </div>
+
+      <div class="status-bar" id="statusBar"></div>
+
+      <div class="terminal-body">
+        <div class="term-prompt">&gt; v2 迭代：圆角自定义下拉框 + 竖横树形连线 + 全界面统一状态标识</div>
+        <div class="term-note"><span class="term-accent">1. 统一圆角下拉框：</span>全插件告别原生 Windows 直角黑框下拉，改用统一圆角悬浮弹出菜单（含图标、副标签与对勾选中态）。可前往「用量统计」或「设置 · CLI 目录」点击任意下拉体验。</div>
+        <div class="term-note"><span class="term-accent">2. 清晰竖横树形连线：</span>左侧工作台严格按「项目 ├─/╰─ CLI 图标 ├─/╰─ 会话」两级竖横折线连接，层级一目了然。</div>
+        <div class="term-note"><span class="term-accent">3. 真实品牌图标 + 全界面统一状态规范：</span>Codex / Antigravity / Claude Code / Kimi Code / OpenCode / Pi 均采用各具辨识度的官方品牌图标；所有运行态标识全插件只用同一套语义色与同一套微胶囊/圆点规范。</div>
+
+        <div class="spec-card">
+          <div class="spec-row">
+            <span class="spec-label">全插件统一运行状态标识（侧栏 &amp; 状态栏严格一致）：</span>
+            <span class="state-badge state-running"><span class="state-dot"></span>Running · 运行中</span>
+            <span class="state-badge state-ready"><span class="state-dot"></span>Ready · 就绪</span>
+            <span class="state-badge state-waiting"><span class="state-dot"></span>Waiting · 等待确认</span>
+            <span class="state-badge state-exited"><span class="state-dot"></span>Exited · 历史离线</span>
+          </div>
+          <div class="spec-row" style="justify-content:space-between;padding-top:4px;border-top:1px solid var(--palette-line)">
+            <span style="font-size:12px;color:var(--palette-fg-subtle)">点击下方快捷按钮或顶部导航条逐一体验改进效果：</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="ui-btn primary" onclick="openView('usage')">体验用量统计圆角下拉</button>
+              <button class="ui-btn" onclick="openView('settings:directories')">体验 CLI 目录圆角下拉</button>
+              <button class="ui-btn" onclick="openView('history')">历史提示词抽屉</button>
+              <button class="ui-btn" onclick="openView('modals')">小弹窗 &amp; 菜单集</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. 历史提示词右侧抽屉 -->
+      <div class="history-backdrop" id="historyBackdrop">
+        <section class="history-drawer" role="dialog" aria-label="历史提示词">
+          <header class="modal-header">
+            <div class="modal-header-left">
+              <div class="modal-icon" id="historyCliIcon"></div>
+              <div style="min-width:0">
+                <h2 style="display:flex;align-items:center;gap:7px">
+                  历史提示词
+                  <span class="filter-badge neutral" id="historyCountBadge">5 条</span>
+                </h2>
+                <div class="header-breadcrumb"><span class="curr" id="historySessionTitle"></span></div>
+              </div>
+            </div>
+            <div class="modal-header-actions">
+              <button class="ui-btn" id="historyRefreshBtn">刷新</button>
+              <button class="ui-btn ghost icon-only" onclick="closeOverlays()" aria-label="关闭">×</button>
+            </div>
+          </header>
+          <div class="history-toolbar">
+            <div class="search-input-box" style="flex:1">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="search" id="historySearchInput" placeholder="搜索本会话提示词内容…">
+            </div>
+          </div>
+          <div class="history-list" id="historyList"></div>
+          <footer class="modal-footer">
+            <span>只读查看历史提示词，支持单条复制。</span>
+            <span id="historyCopyStatus" style="color:var(--palette-success)"></span>
+          </footer>
+        </section>
+      </div>
+    </main>
+
+    <!-- 3. 用量统计弹窗 -->
+    <div class="overlay-backdrop" id="usageBackdrop">
+      <section class="modal-card usage-modal" role="dialog" aria-label="用量统计">
+        <header class="modal-header">
+          <div class="modal-header-left">
+            <div class="modal-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7" rx="1"/><rect x="12" y="6" width="3" height="11" rx="1"/><rect x="17" y="13" width="3" height="4" rx="1"/></svg>
+            </div>
+            <h2>用量统计</h2>
+            <div class="header-breadcrumb" id="usageBreadcrumb"></div>
+          </div>
+          <div class="modal-header-actions">
+            <button class="ui-btn" id="usageRefreshBtn">刷新</button>
+            <button class="ui-btn ghost icon-only" onclick="closeOverlays()" aria-label="关闭">×</button>
+          </div>
+        </header>
+
+        <!-- 三级级联圆角下拉：项目 -> 会话 -> 模型 -->
+        <div class="usage-filter-bar">
+          <div class="filter-field">
+            <div class="filter-label-row">
+              <span class="filter-label">项目</span>
+              <span class="filter-badge neutral" id="uProjectBadge">PowerShell 7</span>
+            </div>
+            <div id="uProjectSelect"></div>
+          </div>
+
+          <div class="cascade-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+
+          <div class="filter-field">
+            <div class="filter-label-row">
+              <span class="filter-label">会话</span>
+              <span class="filter-badge" id="uSessionBadge">Codex</span>
+            </div>
+            <div id="uSessionSelect"></div>
+          </div>
+
+          <div class="cascade-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+
+          <div class="filter-field">
+            <div class="filter-label-row">
+              <span class="filter-label">模型</span>
+              <span class="filter-badge neutral" id="uModelBadge">3 个可选</span>
+            </div>
+            <div id="uModelSelect"></div>
+          </div>
+        </div>
+
+        <div class="usage-body">
+          <div class="period-bar">
+            <div class="segmented" id="uPeriodGroup">
+              <button type="button" data-period="year" aria-pressed="true"><span>近 12 个月</span><span class="seg-val" id="uSegYear">0</span></button>
+              <button type="button" data-period="month" aria-pressed="false"><span>本月</span><span class="seg-val" id="uSegMonth">0</span></button>
+              <button type="button" data-period="week" aria-pressed="false"><span>本周</span><span class="seg-val" id="uSegWeek">0</span></button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--palette-fg-subtle);font-variant-numeric:tabular-nums">
+              <span class="filter-badge neutral" id="uScopeChip">Codex</span>
+              <span id="uRangeText"></span>
+            </div>
+          </div>
+
+          <div class="kpi-grid">
+            <div class="kpi-card primary">
+              <div class="kpi-head"><span>总 Tokens</span><span id="uKpiPeriod">近 12 个月</span></div>
+              <div class="kpi-value" id="uKpiTokens">0</div>
+              <div class="kpi-sub" id="uKpiTokensExact">0 Tokens</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-head"><span>缓存读取占比</span></div>
+              <div class="kpi-value" id="uKpiCacheRate">0%</div>
+              <div class="kpi-sub" id="uKpiCacheSub">缓存读取 0</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-head"><span>统计会话</span></div>
+              <div class="kpi-value" id="uKpiSessions">0</div>
+              <div class="kpi-sub" id="uKpiSessionsSub">覆盖 0 个模型</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-head"><span>活跃天数</span></div>
+              <div class="kpi-value" id="uKpiDays">0 天</div>
+              <div class="kpi-sub" id="uKpiAvg">活跃日均 0</div>
+            </div>
+          </div>
+
+          <section class="panel-card">
+            <div class="card-head">
+              <div class="card-head-left">
+                <h3 class="card-title" id="uChartTitle">每日 Token 活跃热力图</h3>
+                <span class="card-sub" id="uChartPeak">单日峰值 0</span>
+              </div>
+              <div id="uChartLegend"></div>
+            </div>
+            <div id="uChartBody"></div>
+          </section>
+
+          <section class="panel-card">
+            <div class="card-head">
+              <div class="card-head-left" style="flex-wrap:wrap;align-items:center">
+                <h3 class="card-title">模型用量明细</h3>
+                <div class="model-summary-pills" id="uModelBriefList"></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="card-sub">悬停统计条或模型查看拆分 · 点击可筛选</span>
+                <div id="uModelClearArea"></div>
+              </div>
+            </div>
+            <div id="uComposition" style="display:flex;flex-direction:column;gap:7px">
+              <div class="stacked-bar" id="uStackedBar"></div>
+              <div class="comp-legend" id="uCompLegend"></div>
+            </div>
+            <div style="overflow-x:auto" id="uModelTable"></div>
+          </section>
+        </div>
+
+        <footer class="modal-footer">
+          <div class="disclaimer">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>以上统计数据基于本地 CLI 会话日志解析估算，<strong>仅供参考</strong>，实际消耗与计费请以各服务商官方为准。</span>
+          </div>
+          <span id="uFooterMeta" style="color:var(--palette-fg-faint);font-variant-numeric:tabular-nums"></span>
+        </footer>
+      </section>
+    </div>
+
+    <!-- 5. 工作台设置弹窗 -->
+    <div class="overlay-backdrop" id="settingsBackdrop">
+      <section class="modal-card settings-modal" role="dialog" aria-label="工作台设置">
+        <header class="modal-header">
+          <div class="modal-header-left">
+            <div class="modal-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </div>
+            <h2>工作台设置</h2>
+          </div>
+          <div class="modal-header-actions">
+            <button class="ui-btn ghost icon-only" onclick="closeOverlays()" aria-label="关闭">×</button>
+          </div>
+        </header>
+        <div class="settings-layout">
+          <nav class="settings-nav" id="settingsNav"></nav>
+          <div class="settings-content" id="settingsContent"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 6. 二级小弹窗 & 菜单集 -->
+    <div class="overlay-backdrop" id="modalsBackdrop">
+      <section class="modal-card showcase-modal" role="dialog" aria-label="全部小弹窗与菜单原型">
+        <header class="modal-header">
+          <div class="modal-header-left">
+            <div class="modal-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            </div>
+            <h2>二级弹窗 &amp; 上下文菜单原型集</h2>
+          </div>
+          <div class="modal-header-actions">
+            <button class="ui-btn ghost icon-only" onclick="closeOverlays()" aria-label="关闭">×</button>
+          </div>
+        </header>
+        <div class="showcase-grid">
+          <div class="showcase-box">
+            <div class="showcase-box-head"><span>添加 WSL 文件夹</span><span class="filter-badge">WSL · Ubuntu-24.04</span></div>
+            <div class="form-body">
+              <div class="form-group">
+                <label>Linux 文件夹绝对路径</label>
+                <input class="ui-input" value="/home/dongdong/Project/KnowVideo" placeholder="/home/user/project">
+                <span class="form-hint">将按该 WSL 发行版扫描历史会话与 Git 分支。</span>
+              </div>
+              <div class="form-actions">
+                <button class="ui-btn" onclick="showToast('已取消')">取消</button>
+                <button class="ui-btn primary" onclick="showToast('已模拟添加 WSL 项目')">添加项目</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="showcase-box">
+            <div class="showcase-box-head"><span>启动 Codex（多账号）</span><span class="filter-badge neutral">TabbyOneAi · PS7</span></div>
+            <div class="form-body">
+              <div class="form-group">
+                <label>Codex 账号 / 数据目录</label>
+                <div id="modalCodexAccountSelect"></div>
+              </div>
+              <div class="form-group">
+                <label>任务名称（可选）</label>
+                <input class="ui-input" placeholder="默认使用 CLI 名称">
+              </div>
+              <div class="form-actions">
+                <button class="ui-btn" onclick="showToast('已取消')">取消</button>
+                <button class="ui-btn primary" onclick="showToast('已模拟启动 Codex 独立账号任务')">启动会话</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="showcase-box">
+            <div class="showcase-box-head"><span>自定义命令与目录</span><span class="filter-badge neutral">TabbyOneAi</span></div>
+            <div class="form-body">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div class="form-group"><label>可执行文件</label><input class="ui-input" value="codex"></div>
+                <div class="form-group"><label>参数 (JSON 数组)</label><input class="ui-input" value='["--model", "gpt-5.4-codex"]'></div>
+              </div>
+              <div class="form-group"><label>工作目录</label><input class="ui-input" value="E:\Project\TabbyOneAi"></div>
+              <div class="form-actions">
+                <button class="ui-btn" onclick="showToast('已取消')">取消</button>
+                <button class="ui-btn primary" onclick="showToast('已模拟启动自定义命令')">启动</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="showcase-box">
+            <div class="showcase-box-head"><span>项目启动菜单 &amp; 会话右键菜单</span><span class="filter-badge neutral">圆角 Popover</span></div>
+            <div style="padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:10px" id="showcaseMenus"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- 全局弹出组件容器 -->
+<div class="cselect-popover" id="cselectPopover" role="listbox"></div>
+<div class="ctx-menu" id="ctxMenu"></div>
+<div class="floating-tip" id="tooltip"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const TODAY = new Date(2026, 10, 19);
+  const compactFmt = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
+  const exactFmt = new Intl.NumberFormat('en-US');
+
+  const PALETTES = [
+    { id:'light', label:'浅色', group:'basic', mode:'light', c:['#ffffff','#f6f8fa','#f0f3f6','#ffffff','#f6f8fa','#eaeef2','#d8dee4','#eaeef2','#ddf0ff','#d0d7de','#afb8c1','#1f2328','#424a53','#59636e','#6e7781','#0969da','#0969da','#0858ba','#1a7f37','#9a6700','#cf222e','#8250df'] },
+    { id:'dark', label:'深色', group:'basic', mode:'dark', c:['#0d1117','#111821','#141d27','#151e28','#1b2532','#202d3b','#2c3d4f','#1c2836','#1c354a','#253342','#354759','#e2e8f0','#cbd5e1','#94a3b8','#738499','#38bdf8','#0284c7','#0ea5e9','#34d399','#fbbf24','#fb7185','#c084fc'] },
+    { id:'bean', label:'豆沙绿', group:'eyecare', mode:'light', c:['#cce8cf','#c0dec4','#b8d6bc','#d8eedb','#c0dec4','#b0ceb4','#a0c0a5','#b8d6bc','#96c8a0','#a0bea5','#78967e','#223226','#344838','#425846','#4c6250','#0e5e8a','#0e5e8a','#0a4c70','#146e32','#8c5a00','#b91c28','#6e40be'] },
+    { id:'lavender', label:'薰衣草', group:'eyecare', mode:'light', c:['#ece8f4','#e5e0ef','#ddd7ea','#f4f1fa','#e5e0ef','#d4cee4','#c6bfda','#ddd7ea','#cdd4f0','#cdc6e0','#a098be','#2c263e','#463e5e','#544c6e','#5c5476','#4252b2','#4252b2','#324096','#1e6e46','#8c5a00','#b9233c','#703eb4'] },
+    { id:'mist', label:'雾灰', group:'eyecare', mode:'light', c:['#e4e9ee','#dce2e8','#d4dbe2','#eef2f6','#dce2e8','#cad2db','#bcc6d1','#d4dbe2','#bed3e8','#c6cfd8','#96a3b1','#212a34','#3a4654','#485462','#525e6c','#146096','#146096','#0e4e7c','#18703c','#8e5c00','#be2832','#7046b4'] },
+    { id:'nord', label:'北极灰蓝', group:'eyecare', mode:'dark', c:['#2e3440','#323946','#373e4d','#3b4252','#3b4252','#434c5e','#4c566a','#3f4758','#42546e','#434c5e','#566176','#e5e9f0','#d8dee9','#a7b0c0','#8c96a8','#88c0d0','#5e81ac','#81a1c1','#a3be8c','#ebcb8b','#d77882','#b48ead'] },
+    { id:'forest', label:'森夜', group:'eyecare', mode:'dark', c:['#181f1b','#1d2520','#222b25','#27312a','#2b362e','#344138','#425247','#2b362e','#2c4c3a','#2e3a32','#46584c','#d6e2d6','#bcccbe','#96a89a','#7e9082','#7ec896','#308254','#3e9c66','#8ccd82','#e2be64','#e87c76','#b896d8'] },
+    { id:'ink', label:'墨夜', group:'eyecare', mode:'dark', c:['#161a26','#1b202e','#202636','#252c3e','#293044','#323b52','#3f4a66','#293044','#34426c','#2c344a','#44506e','#d8deec','#bec6d8','#98a2ba','#808aa4','#8aaaf0','#4668c8','#5a7ee0','#82c88c','#e6be64','#ec7a80','#ba98e2'] },
+    { id:'darcula', label:'Darcula', group:'editor', mode:'dark', c:['#2b2b2b','#323436','#3c3f41','#45494a','#35383a','#4c5052','#5c6163','#484c4e','#214283','#46484a','#5e6062','#bbbbbb','#a9b7c6','#9da1a5','#92969a','#589df6','#3669a8','#4a88c7','#7ca364','#ffc66d','#ff6b68','#b294c4'] },
+    { id:'material', label:'Sublime Material', group:'editor', mode:'dark', c:['#263238','#212c32','#29363d','#2e3c44','#29363d','#37474f','#455a64','#32424a','#345462','#37474f','#546e7a','#eeffff','#b0bec5','#90a4ae','#879da8','#80cbc4','#00897b','#009688','#c3e88d','#ffcb6b','#f07178','#c792ea'] },
+    { id:'monokai', label:'Monokai', group:'editor', mode:'dark', c:['#272822','#2d2e27','#34352c','#3e3d32','#31322a','#49483b','#5a5948','#3a3b30','#545234','#46473a','#626150','#f8f8f2','#d7d7cd','#a6a696','#96937d','#66d9ef','#1e829c','#3ca0b9','#a6e22e','#e6db74','#f92672','#ae81ff'] },
+    { id:'mariana', label:'Mariana', group:'editor', mode:'dark', c:['#2e3842','#242d35','#28323b','#333e48','#28323b','#3e4a55','#4e5b67','#313c46','#465666','#3a4550','#596673','#d8dee9','#cbcdcf','#a6acb9','#969fad','#f9ae58','#5080b4','#6699cc','#a3ce9e','#fab763','#ee6a6f','#c594c5'] },
+    { id:'solarized-dark', label:'Solarized Dark', group:'editor', mode:'dark', c:['#042029','#072630','#0a2933','#0e323e','#0a2933','#123b48','#1c4c5b','#0c2f3a','#144656','#123b48','#3c5a64','#93a1a1','#839496','#758a8e','#6c838a','#268bd2','#1e78b9','#268bd2','#859900','#b58900','#dc322f','#6c71c4'] },
+    { id:'solarized-light', label:'Solarized Light', group:'editor', mode:'light', c:['#fdf6e3','#f7f0dc','#eee8d5','#fffbf0','#f7f0dc','#e8e1cb','#dad3bb','#eee8d5','#cddee2','#ddd6c0','#93a1a1','#073642','#3e5a64','#586e75','#657b83','#1e76b4','#1c70ac','#145f96','#657800','#966e00','#c82624','#585db0'] },
+    { id:'idea-classic-light', label:'IntelliJ Light', group:'editor', mode:'light', c:['#ffffff','#f7f7f7','#f2f2f2','#ffffff','#f7f7f7','#ebebeb','#dfdfdf','#edf5fc','#a6d2ff','#d1d1d1','#b0b0b0','#080808','#404040','#6e6e6e','#808080','#2470b3','#4989cc','#346dad','#4a9249','#a46704','#c7222d','#7444d4'] },
+    { id:'idea-light', label:'IDEA Light', group:'editor', mode:'light', c:['#ffffff','#fafbfc','#f7f8fa','#ffffff','#f7f8fa','#ebecf0','#dfe1e5','#edf3ff','#d4e2ff','#ebecf0','#c9ccd6','#080808','#383a42','#6c707e','#787c8b','#3574f0','#3574f0','#3369d6','#208a3c','#a46704','#db3b4b','#7444d4'] },
+    { id:'kiro-dark', label:'Kiro Dark', group:'editor', mode:'dark', c:['#211d25','#24202a','#28242e','#2d2834','#28242e','#352f3d','#4a464f','#302c36','#3a3050','#4a464f','#6a6571','#f2f1f4','#d0cdd6','#a9a5b1','#938f9b','#b080ff','#7138cc','#8e47ff','#80ffb5','#ffcf99','#ff8080','#8e47ff'] },
+    { id:'kiro-light', label:'Kiro Light', group:'editor', mode:'light', c:['#f2f1f4','#f6f5f8','#eae8ed','#ffffff','#eae8ed','#e0dee5','#d1ced7','#e8e6ec','#e2dbef','#c1bec6','#938f9b','#352f3d','#544e5d','#706a7a','#7a7484','#7138cc','#7138cc','#6432b3','#367c53','#a86210','#993333','#8e47ff'] },
+  ];
+  const ROLES = ['canvas','surface','panel','elevated','muted','control','control-hover','hover','selected','line','line-strong','fg','fg-muted','fg-subtle','fg-faint','accent','primary','primary-hover','success','warning','danger','violet'];
+
+  // 直接复用项目 src/cli-icons.ts 的真实官方品牌图标，各具鲜明辨识度
+  const CLI_META = {
+    codex: {
+      name:'Codex', exec:'codex', envVar:'CODEX_HOME',
+      icon:`<span class="cli-svg"><svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357 1.356-.523 2.117-.523 2.854 0 4.662 2.212 4.662 4.566 0 .167 0 .357-.024.547l-4.71-2.759a.797.797 0 00-.856 0l-5.97 3.473zm10.609 8.8V12.06c0-.333-.143-.57-.429-.737l-5.97-3.473 1.95-1.118a.433.433 0 01.476 0l4.543 2.617c1.309.76 2.189 2.378 2.189 3.948 0 1.808-1.07 3.473-2.76 4.163zM7.802 12.703l-1.95-1.142c-.167-.095-.239-.238-.239-.428V5.899c0-2.545 1.95-4.472 4.591-4.472 1 0 1.927.333 2.712.928L8.23 5.067c-.285.166-.428.404-.428.737v6.898zM12 15.128l-2.795-1.57v-3.33L12 8.658l2.795 1.57v3.33L12 15.128zm1.796 7.23c-1 0-1.927-.332-2.712-.927l4.686-2.712c.285-.166.428-.404.428-.737v-6.898l1.974 1.142c.167.095.238.238.238.428v5.233c0 2.545-1.974 4.472-4.614 4.472zm-5.637-5.303l-4.544-2.617c-1.308-.761-2.188-2.378-2.188-3.948A4.482 4.482 0 014.21 6.327v5.423c0 .333.143.571.428.738l5.947 3.449-1.95 1.118a.432.432 0 01-.476 0zm-.262 3.9c-2.688 0-4.662-2.021-4.662-4.519 0-.19.024-.38.047-.57l4.686 2.71c.286.167.571.167.856 0l5.97-3.448v2.26c0 .19-.07.333-.237.428l-4.543 2.616c-.619.357-1.356.523-2.117.523zm5.899 2.83a5.947 5.947 0 005.827-4.756C22.287 18.339 24 15.84 24 13.296c0-1.665-.713-3.282-1.998-4.448.119-.5.19-.999.19-1.498 0-3.401-2.759-5.947-5.946-5.946-.642 0-1.26.095-1.88.31A5.962 5.962 0 0010.205 0a5.947 5.947 0 00-5.827 4.757C1.713 5.447 0 7.945 0 10.49c0 1.666.713 3.283 1.998 4.448-.119.5-.19 1-.19 1.499 0 3.401 2.759 5.946 5.946 5.946.642 0 1.26-.095 1.88-.309a5.96 5.96 0 004.162 1.713z" fill="currentColor"/></svg></span>`
+    },
+    agy: {
+      name:'Antigravity', exec:'agy', envVar:'',
+      icon:`<span class="cli-svg"><svg viewBox="0 0 96 96" fill="none"><path d="M85.973 89.344c5.25 3.937 13.125 1.312 5.907-5.906-21.657-21-17.063-78.75-43.97-78.75-26.905 0-22.312 57.75-43.968 78.75-7.875 7.874.656 9.843 5.906 5.906C30.192 75.563 28.88 51.28 47.911 51.28c19.031 0 17.719 24.282 38.062 38.063Z" fill="url(#agyG)"/><defs><linearGradient id="agyG" x1="8" y1="10" x2="88" y2="88" gradientUnits="userSpaceOnUse"><stop stop-color="#3186FF"/><stop offset="0.48" stop-color="#00B95C"/><stop offset="1" stop-color="#FBBC04"/></linearGradient></defs></svg></span>`
+    },
+    claude: {
+      name:'Claude Code', exec:'claude', envVar:'CLAUDE_CONFIG_DIR',
+      icon:`<span class="cli-svg"><svg viewBox="0 0 24 24"><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z" fill="#D97757"/></svg></span>`
+    },
+    kimi: {
+      name:'Kimi Code', exec:'kimi', envVar:'KIMI_CODE_HOME',
+      icon:`<span class="cli-svg"><svg viewBox="0 0 24 24"><path d="M21.846 0a1.923 1.923 0 110 3.846H20.15a.226.226 0 01-.227-.226V1.923C19.923.861 20.784 0 21.846 0z" fill="#1783FF"/><path d="M11.065 11.199l7.257-7.2c.137-.136.06-.41-.116-.41H14.3a.164.164 0 00-.117.051l-7.82 7.756c-.122.12-.302.013-.302-.179V3.82c0-.127-.083-.23-.185-.23H3.186c-.103 0-.186.103-.186.23V19.77c0 .128.083.23.186.23h2.69c.103 0 .186-.102.186-.23v-3.25c0-.069.025-.135.069-.178l2.424-2.406a.158.158 0 01.205-.023l6.484 4.772a7.677 7.677 0 003.453 1.283c.108.012.2-.095.2-.23v-3.06c0-.117-.07-.212-.164-.227a5.028 5.028 0 01-2.027-.807l-5.613-4.064c-.117-.078-.132-.279-.028-.381z" fill="#83a0bc"/></svg></span>`
+    },
+    opencode: {
+      name:'OpenCode', exec:'opencode', envVar:'',
+      icon:`<span class="cli-svg"><svg viewBox="0 0 512 512"><rect width="512" height="512" rx="96" fill="#1C2333"/><path d="M320 224V352H192V224H320Z" fill="#38BDF8"/><path fill-rule="evenodd" clip-rule="evenodd" d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z" fill="#F1ECEC"/></svg></span>`
+    },
+    pi: {
+      name:'Pi', exec:'pi', envVar:'PI_CODING_AGENT_DIR',
+      icon:`<span class="cli-svg"><svg viewBox="165 165 470 470"><path fill="#F09082" d="M165.29 165.29H517.36V400H400V282.65H165.29Z"/><path fill="#4D9ABF" d="M165.29 282.65H282.65V400H400V517.36H282.65V634.72H165.29Z"/><path fill="#F1BE58" d="M517.36 400H634.72V634.72H517.36Z"/></svg></span>`
+    },
+  };
+
+  // 全插件唯一的状态元信息表
+  const STATUS_META = {
+    running: { label:'Running', cls:'state-running' },
+    ready:   { label:'Ready',   cls:'state-ready' },
+    waiting: { label:'Waiting', cls:'state-waiting' },
+    exited:  { label:'Exited',  cls:'state-exited' },
+  };
+
+  function daysAgo(n) { return new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - n).getTime(); }
+  function dateKey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+  function genHistory(seed, weights, count) {
+    let s = seed;
+    const rand = () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const ago = Math.floor(rand() * 340) + 4;
+      let r = rand(), acc = 0, model = weights[0][0];
+      for (const [m, w] of weights) { acc += w; if (r <= acc) { model = m; break; } }
+      const scale = 0.4 + rand() * 2.1;
+      const input = Math.round(1350000 * scale);
+      const cached = Math.round(input * (3.5 + rand() * 3.5));
+      const output = Math.round(input * (0.14 + rand() * 0.2));
+      out.push({ date: daysAgo(ago), model, input, cached, output });
+    }
+    return out;
+  }
+
+  const PROJECTS = [
+    {
+      id: 'dentist', name: 'dentist_app', env: 'PowerShell 7', wsl: false, branch: 'main', missingSessions: 0,
+      sessions: [
+        { id:'den-1', cli:'codex', title:'评估安卓端离线同步方案', time:'11-18', status:'exited', opened:false, model:'gpt-5.4-codex', effort:'medium', context:42, h5:88, d7:64, entries:[{date:daysAgo(1),model:'gpt-5.4-codex',input:3200000,cached:18400000,output:640000}, ...genHistory(11,[['gpt-5.4-codex',0.7],['gpt-5.3-codex-mini',0.3]],18)] },
+        { id:'den-2', cli:'codex', title:'新增患者同意书签名导出', time:'07-13', status:'exited', opened:false, model:'gpt-5.4-codex', effort:'medium', context:28, h5:88, d7:64, entries:[{date:daysAgo(8),model:'gpt-5.4-codex',input:1800000,cached:9600000,output:390000}] },
+        { id:'den-3', cli:'codex', title:'评估财务列表与报表权限', time:'07-12', status:'exited', opened:false, model:'gpt-5.3-codex-mini', effort:'low', context:19, h5:88, d7:64, entries:[{date:daysAgo(12),model:'gpt-5.3-codex-mini',input:1100000,cached:5400000,output:210000}] },
+      ],
+    },
+    {
+      id: 'tabby', name: 'TabbyOneAi', env: 'PowerShell 7', wsl: false, branch: 'main', missingSessions: 1,
+      sessions: [
+        {
+          id:'tabby-1', cli:'codex', title:'评估 OneAI 融合 Tabby 方案', time:'08:34', status:'ready', opened:true,
+          model:'gpt-6.2-sol', effort:'high', context:76, h5:96, h5Reset:'3h 58m', d7:0, d7Reset:'3d 10h',
+          entries:[
+            { date:daysAgo(0), model:'gpt-6.2-sol', input:11840000, cached:96420000, output:1920000 },
+            { date:daysAgo(1), model:'gpt-6.2-sol', input:5920000, cached:41310000, output:940000 },
+            { date:daysAgo(0), model:'gpt-5.3-codex-mini', input:2410000, cached:12180000, output:680000 },
+            { date:daysAgo(1), model:'o3', input:1580000, cached:4520000, output:525910 },
+          ],
+          prompts: [
+            { at:'2026-11-19 09:51', text:'下拉框应该用圆角更合适，工作台这个线要那种项目竖横连到模型然后模型竖横连到会话这样比较清晰明了结构的方式设计。模型图标可以不一样，运行、准备等状态标识颜色和样式应该统一。' },
+            { at:'2026-11-19 08:34', text:'插件的其它所有的界面的 UI 也重新设计下显示效果和布局出设计原型图，用 HTML 的方式让我可以点击查看样式。' },
+            { at:'2026-11-19 08:21', text:'用量统计应该分三个选项：项目 → 会话 → 模型，默认选择当前项目的当前会话的全部模型，多模型可切单个模型，也可切该项目全部会话，并说明统计数据仅供参考。' },
+            { at:'2026-11-18 22:14', text:'核对 Claude Code 和 Kimi Code 的状态接入，以及数据目录的存在性检测。' },
+          ]
+        },
+        {
+          id:'tabby-2', cli:'claude', title:'护眼配色与本机字体搜索', time:'11-16', status:'running', opened:true, unread:true,
+          model:'claude-sonnet-4.5', effort:'high', context:54, h5:72, h5Reset:'2h 15m', d7:48, d7Reset:'4d 2h',
+          entries:[
+            { date:daysAgo(3), model:'claude-sonnet-4.5', input:5120000, cached:36800000, output:980000 },
+            { date:daysAgo(5), model:'claude-opus-4.1', input:2400000, cached:14500000, output:640000 },
+            ...genHistory(77,[['claude-sonnet-4.5',0.7],['claude-opus-4.1',0.3]],32),
+          ]
+        },
+        {
+          id:'tabby-3', cli:'kimi', title:'核对 Kimi 新旧日志目录格式', time:'11-12', status:'exited', opened:false,
+          model:'kimi-k2-thinking', effort:'', context:31, h5:100, d7:90,
+          entries:[{ date:daysAgo(7), model:'kimi-k2-thinking', input:3640000, cached:18900000, output:790000 }, ...genHistory(88,[['kimi-k2-thinking',1]],18)]
+        },
+      ],
+    },
+    {
+      id: 'knowvideo', name: 'KnowVideo', env: 'WSL · Ubuntu', wsl: true, branch: 'main', missingSessions: 2,
+      sessions: [
+        { id:'kv-1', cli:'agy', title:'视频生成系统时间轴渲染优化', time:'08:31', status:'running', opened:true, model:'gemini-2.5-pro', effort:'high', context:62, h5:84, h5Reset:'4h 12m', d7:71, d7Reset:'5d 6h', entries:[{date:daysAgo(0),model:'gemini-2.5-pro',input:8900000,cached:52400000,output:1620000}, ...genHistory(201,[['gemini-2.5-pro',0.75],['claude-sonnet-4.5',0.25]],38)] },
+        { id:'kv-2', cli:'agy', title:'KnowVideo 字幕对齐与导出', time:'11-18', status:'exited', opened:false, model:'gemini-2.5-pro', effort:'medium', context:39, h5:84, d7:71, entries:[{date:daysAgo(1),model:'gemini-2.5-pro',input:4200000,cached:21000000,output:710000}] },
+        { id:'kv-3', cli:'pi', title:'介绍下这个项目的导出架构', time:'11-18', status:'waiting', opened:true, model:'claude-sonnet-4.5', effort:'', context:48, h5:66, d7:55, entries:[{date:daysAgo(1),model:'claude-sonnet-4.5',input:3100000,cached:19600000,output:610000}, ...genHistory(303,[['claude-sonnet-4.5',0.6],['gpt-5.4-codex',0.4]],22)] },
+        { id:'kv-4', cli:'codex', title:'复核动效与配音节拍逻辑', time:'11-17', status:'exited', opened:false, model:'gpt-5.4-codex', effort:'high', context:51, h5:96, d7:0, entries:[{date:daysAgo(2),model:'gpt-5.4-codex',input:4400000,cached:28700000,output:880000}, ...genHistory(404,[['gpt-5.4-codex',0.8],['o3',0.2]],26)] },
+      ],
+    },
+  ];
+
+  const MODEL_COLORS = {
+    'gpt-6.2-sol':'#38bdf8', 'gpt-5.4-codex':'#38bdf8', 'gpt-5.3-codex-mini':'#34d399',
+    'o3':'#a78bfa', 'claude-sonnet-4.5':'#D97757', 'claude-opus-4.1':'#f472b6',
+    'gemini-2.5-pro':'#60a5fa', 'kimi-k2-thinking':'#fbbf24',
+  };
+
+  const appState = {
+    theme: 'dark',
+    followFontSize: false,
+    fontSize: 13,
+    fontFamily: '',
+    fontList: ['Cascadia Code', 'Consolas', 'HarmonyOS Sans SC', 'Inter', 'JetBrains Mono', 'Microsoft YaHei UI', 'PingFang SC', 'Segoe UI', 'Sarasa Gothic SC'],
+    collapsed: false,
+    foldedProjects: new Set(),
+    foldedGroups: new Set(),
+    treeQuery: '',
+    activeProjectId: 'tabby',
+    activeSessionId: 'tabby-1',
+    currentView: 'workbench',
+    settingsTab: 'appearance',
+    usage: { projectId: 'tabby', sessionId: 'tabby-1', model: '', period: 'year' },
+    dirCli: 'codex',
+    dirEnv: 'ps7',
+    dirAdding: false,
+    preferredDirId: { codex:'default', claude:'default', kimi:'kimi-code', pi:'default' },
+    directories: {
+      codex: [
+        { id:'default', name:'环境默认目录', path:'C:\\Users\\admin\\.codex', exists:true },
+        { id:'work', name:'工作主号 (Plus)', path:'D:\\CLI-Data\\codex-work', exists:true },
+        { id:'backup', name:'备用测试目录', path:'D:\\CLI-Data\\codex-sandbox', exists:false },
+      ],
+      claude: [{ id:'default', name:'环境默认目录', path:'C:\\Users\\admin\\.claude', exists:true }],
+      kimi: [
+        { id:'kimi-code', name:'Kimi Code 新版目录', path:'C:\\Users\\admin\\.kimi', exists:true },
+        { id:'default', name:'旧版目录 (KIMI_SHARE_DIR)', path:'C:\\Users\\admin\\.local\\share\\kimi', exists:false, legacy:true },
+      ],
+      pi: [{ id:'default', name:'环境默认目录', path:'C:\\Users\\admin\\.pi\\agent', exists:true }],
+      agy: [{ id:'default', name:'环境默认目录', path:'C:\\Users\\admin\\.gemini\\antigravity-cli', exists:true }],
+      opencode: [{ id:'default', name:'当前数据库', path:'C:\\Users\\admin\\.local\\share\\opencode\\opencode.db', exists:true }],
+    },
+    cliDetectEnv: 'ps7',
+    detectedMap: { ps7:['codex','agy','claude','kimi','pi'], ubuntu:['codex','agy','claude','opencode','pi'] },
+    removedSessions: [
+      { id:'rem-1', cli:'codex', project:'TabbyOneAi', title:'验证 Tabby v1.0.238 分屏焦点切换', removedAt:'2026-11-18 19:22' },
+      { id:'rem-2', cli:'claude', project:'KnowVideo', title:'批量字幕时间戳漂移排查（旧记录）', removedAt:'2026-11-15 11:08' },
+    ],
+    shortcuts: [
+      { name:'切换 AI 工作台侧栏', desc:'快速展开或折叠左侧项目树', keys:'Ctrl + Shift + B' },
+      { name:'打开用量统计面板', desc:'查看当前会话与项目的 Token 统计', keys:'Ctrl + Alt + U' },
+      { name:'打开历史提示词抽屉', desc:'只读回看当前会话的历史提示词', keys:'未设置' },
+      { name:'打开工作台设置', desc:'调整外观主题、CLI 目录与会话管理', keys:'未设置' },
+    ],
+    modalCodexAccount: 'default',
+    historyQuery: '',
+    expandedPrompts: new Set(),
+  };
+
+  const $ = (id) => document.getElementById(id);
+
+  function showToast(msg) {
+    const el = $('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => el.classList.remove('show'), 2000);
+  }
+  window.showToast = showToast;
+
+  /* ===== 统一自定义圆角下拉框组件 ===== */
+  let activeSelectTrigger = null;
+
+  function closeCustomSelect() {
+    const pop = $('cselectPopover');
+    pop.classList.remove('open');
+    if (activeSelectTrigger) {
+      activeSelectTrigger.setAttribute('aria-expanded', 'false');
+      activeSelectTrigger = null;
+    }
+  }
+
+  function renderCustomSelect(mountEl, { value, options, disabled = false, onChange }) {
+    const current = options.find(o => o.value === value) || options[0] || { label: '无选项', value: '' };
+    mountEl.innerHTML = `
+      <button type="button" class="cselect-trigger" aria-haspopup="listbox" aria-expanded="false" ${disabled ? 'disabled' : ''}>
+        <span class="cselect-value">
+          ${current.icon || ''}
+          <span class="cselect-value-text">${current.label}</span>
+        </span>
+        <span class="cselect-arrow">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+        </span>
+      </button>
+    `;
+    const btn = mountEl.querySelector('.cselect-trigger');
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (disabled) return;
+      const pop = $('cselectPopover');
+      if (activeSelectTrigger === btn && pop.classList.contains('open')) {
+        closeCustomSelect();
+        return;
+      }
+      closeCtxMenu();
+      closeCustomSelect();
+      activeSelectTrigger = btn;
+      btn.setAttribute('aria-expanded', 'true');
+
+      pop.innerHTML = options.map((o, idx) => `
+        <button type="button" class="cselect-option ${o.value === value ? 'selected' : ''}" data-cidx="${idx}" role="option" aria-selected="${o.value === value}">
+          ${o.icon || ''}
+          <span class="cselect-opt-label">${o.label}</span>
+          ${o.meta ? `<span class="cselect-opt-meta">${o.meta}</span>` : ''}
+          <span class="cselect-opt-check">${o.value === value ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</span>
+        </button>
+      `).join('');
+
+      const rect = btn.getBoundingClientRect();
+      pop.style.width = `${Math.max(rect.width, 190)}px`;
+      pop.classList.add('open');
+      const popRect = pop.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < Math.min(popRect.height + 16, 220) && rect.top > spaceBelow;
+      pop.style.left = `${Math.min(Math.max(8, rect.left), window.innerWidth - popRect.width - 8)}px`;
+      pop.style.top = openUp ? `${Math.max(8, rect.top - popRect.height - 5)}px` : `${rect.bottom + 5}px`;
+
+      pop.querySelectorAll('.cselect-option').forEach(optBtn => {
+        optBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const picked = options[Number(optBtn.dataset.cidx)];
+          closeCustomSelect();
+          if (picked && picked.value !== value) onChange(picked.value);
+        });
+      });
+    });
+  }
+
+  function applyPalette(id) {
+    const pal = PALETTES.find(p => p.id === id) || PALETTES[1];
+    appState.theme = pal.id;
+    const root = document.documentElement;
+    root.style.colorScheme = pal.mode;
+    ROLES.forEach((role, idx) => root.style.setProperty(`--palette-${role}`, pal.c[idx]));
+    root.style.setProperty('--heat-empty', pal.mode === 'dark' ? 'rgba(148,163,184,0.13)' : 'rgba(15,23,42,0.08)');
+    root.style.setProperty('--shadow-dialog', pal.mode === 'dark'
+      ? '0 24px 68px rgba(0, 0, 0, 0.56), 0 0 0 1px rgba(255,255,255,0.04)'
+      : '0 24px 60px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15,23,42,0.06)');
+    if (appState.currentView.startsWith('settings:appearance')) renderSettingsContent();
+  }
+
+  function getActiveSession() {
+    const p = PROJECTS.find(x => x.id === appState.activeProjectId) || PROJECTS[1];
+    const s = p.sessions.find(x => x.id === appState.activeSessionId) || p.sessions[0];
+    return { project: p, session: s };
+  }
+
+  function sumTokens(entries) { return (entries || []).reduce((acc, e) => acc + e.input + e.cached + e.output, 0); }
+
+  /* ===== 1. 渲染左侧项目树（项目 竖横→ 模型 竖横→ 会话） ===== */
+  function renderSidebar() {
+    const sb = $('sidebar');
+    sb.classList.toggle('collapsed', appState.collapsed);
+    $('collapseSidebarBtn').innerHTML = appState.collapsed
+      ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>`
+      : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>`;
+
+    const container = $('sidebarTree');
+    if (appState.collapsed) {
+      container.innerHTML = PROJECTS.map(p => {
+        const hasActive = p.id === appState.activeProjectId;
+        const live = p.sessions.find(s => s.status === 'running') || p.sessions.find(s => s.status === 'waiting') || p.sessions.find(s => s.status === 'ready');
+        const st = live ? STATUS_META[live.status] : null;
+        return `
+          <button class="rail-item ${hasActive ? 'has-active' : ''}" data-rail-project="${p.id}" title="${p.name} · ${p.env}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            ${st ? `<span class="rail-dot state-dot ${st.cls}"></span>` : ''}
+          </button>
+        `;
+      }).join('');
+      container.querySelectorAll('[data-rail-project]').forEach(btn => btn.addEventListener('click', e => openContextMenu(e, 'project', btn.dataset.railProject)));
+      return;
+    }
+
+    const q = appState.treeQuery.trim().toLowerCase();
+    container.innerHTML = PROJECTS.map(p => {
+      const folded = appState.foldedProjects.has(p.id);
+      const groups = new Map();
+      for (const s of p.sessions) {
+        if (q && !p.name.toLowerCase().includes(q) && !s.title.toLowerCase().includes(q) && !CLI_META[s.cli].name.toLowerCase().includes(q)) continue;
+        if (!groups.has(s.cli)) groups.set(s.cli, []);
+        groups.get(s.cli).push(s);
+      }
+      if (q && groups.size === 0) return '';
+
+      const groupsHtml = [...groups.entries()].map(([cliKey, rows]) => {
+        const cli = CLI_META[cliKey];
+        const gid = `${p.id}:${cliKey}`;
+        const gFolded = appState.foldedGroups.has(gid);
+        const live = rows.find(r => r.status === 'running') || rows.find(r => r.status === 'waiting') || rows.find(r => r.status === 'ready');
+        const st = live ? STATUS_META[live.status] : null;
+
+        const rowsHtml = rows.map(s => {
+          const isAct = p.id === appState.activeProjectId && s.id === appState.activeSessionId;
+          const rowSt = STATUS_META[s.status] || STATUS_META.exited;
+          return `
+            <li class="tree-node session-node">
+              <div class="session-row ${isAct ? 'active' : ''} ${s.opened ? 'opened' : ''}"
+                   data-select-project="${p.id}" data-select-session="${s.id}" title="${s.title} · ${rowSt.label}">
+                <span class="state-dot ${rowSt.cls}" aria-label="${rowSt.label}"></span>
+                <span class="session-title">${s.title}</span>
+                ${s.unread ? `<span class="unread-pip">新输出</span>` : `<span class="session-time">${s.time}</span>`}
+                <span class="session-hover-actions">
+                  <button class="tiny-action" data-quick-usage="${p.id}|${s.id}" title="查看该会话用量统计">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="13" y="7" width="3" height="10"/></svg>
+                  </button>
+                  <button class="tiny-action" data-quick-history="${p.id}|${s.id}" title="查看历史提示词">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+                  </button>
+                </span>
+              </div>
+            </li>
+          `;
+        }).join('');
+
+        return `
+          <li class="tree-node">
+            <div class="cli-group-head" data-toggle-group="${gid}" data-ctx-group="${p.id}|${cliKey}">
+              ${cli.icon}
+              <span class="cli-group-name">${cli.name}</span>
+              ${st ? `<span class="state-badge ${st.cls}"><span class="state-dot"></span>${st.label}</span>` : ''}
+              <span class="chevron ${gFolded ? 'folded' : ''}" style="margin-left:auto">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+              </span>
+            </div>
+            ${gFolded ? '' : `
+              <ul class="tree-branch-list cli-tree-children">
+                ${rowsHtml}
+                ${rows.length >= 3 ? `<li class="tree-node more-node"><button class="tree-more-btn" onclick="showToast('已展开更多 ${cli.name} 历史会话')">更多会话…</button></li>` : ''}
+              </ul>
+            `}
+          </li>
+        `;
+      }).join('');
+
+      return `
+        <section class="project-block">
+          <div class="project-header" data-toggle-project="${p.id}">
+            <span class="chevron ${folded ? 'folded' : ''}">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polyline points="6 9 12 15 18 9"/></svg>
+            </span>
+            <span class="folder-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </span>
+            <div class="project-meta">
+              <span class="project-name" title="${p.name} · ${p.env}">${p.name}</span>
+              <span class="env-tag ${p.wsl ? 'wsl' : ''}">${p.wsl ? 'WSL' : 'WIN'}</span>
+            </div>
+            <span class="branch-pill" title="Git 分支：${p.branch}">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4v8M12 5c0 3-1 4.5-4 4.5H4"/><circle cx="4" cy="2.5" r="1.4"/><circle cx="4" cy="13.5" r="1.4"/><circle cx="12" cy="3.5" r="1.4"/></svg>
+              <span>${p.branch}</span>
+            </span>
+            <button class="project-quick-add" data-launch-project="${p.id}" title="在 ${p.name} 中启动新会话">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          ${folded ? '' : `<ul class="tree-branch-list project-tree-children">${groupsHtml}</ul>`}
+        </section>
+      `;
+    }).join('');
+
+    container.querySelectorAll('[data-toggle-project]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-launch-project]')) return;
+        const id = el.dataset.toggleProject;
+        if (appState.foldedProjects.has(id)) appState.foldedProjects.delete(id);
+        else appState.foldedProjects.add(id);
+        renderSidebar();
+      });
+      el.addEventListener('contextmenu', e => openContextMenu(e, 'project', el.dataset.toggleProject));
+    });
+
+    container.querySelectorAll('[data-launch-project]').forEach(btn => {
+      btn.addEventListener('click', e => { e.stopPropagation(); openContextMenu(e, 'launcher', btn.dataset.launchProject); });
+    });
+
+    container.querySelectorAll('[data-toggle-group]').forEach(el => {
+      el.addEventListener('click', () => {
+        const gid = el.dataset.toggleGroup;
+        if (appState.foldedGroups.has(gid)) appState.foldedGroups.delete(gid);
+        else appState.foldedGroups.add(gid);
+        renderSidebar();
+      });
+      el.addEventListener('contextmenu', e => openContextMenu(e, 'group', el.dataset.ctxGroup));
+    });
+
+    container.querySelectorAll('[data-select-session]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('.tiny-action')) return;
+        appState.activeProjectId = el.dataset.selectProject;
+        appState.activeSessionId = el.dataset.selectSession;
+        const { session } = getActiveSession();
+        session.unread = false;
+        renderSidebar();
+        renderStatusBar();
+      });
+      el.addEventListener('contextmenu', e => openContextMenu(e, 'session', `${el.dataset.selectProject}|${el.dataset.selectSession}`));
+    });
+
+    container.querySelectorAll('[data-quick-usage]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const [pid, sid] = btn.dataset.quickUsage.split('|');
+        appState.usage = { projectId: pid, sessionId: sid, model: '', period: 'year' };
+        openView('usage');
+      });
+    });
+
+    container.querySelectorAll('[data-quick-history]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const [pid, sid] = btn.dataset.quickHistory.split('|');
+        appState.activeProjectId = pid; appState.activeSessionId = sid;
+        renderSidebar(); renderStatusBar(); openView('history');
+      });
+    });
+  }
+
+  /* ===== 2. 渲染顶部任务状态栏（与侧栏完全一致的 .state-badge） ===== */
+  function renderStatusBar() {
+    const { project, session } = getActiveSession();
+    const cli = CLI_META[session.cli];
+    const st = STATUS_META[session.status] || STATUS_META.exited;
+    const totalTok = sumTokens(session.entries);
+    const toneOf = (v) => v < 25 ? 'bad' : v < 60 ? 'warn' : 'good';
+    const ctxColor = session.context >= 80 ? 'var(--palette-danger)' : session.context >= 60 ? 'var(--palette-warning)' : 'var(--palette-accent)';
+
+    const tab = $('activeNativeTab');
+    tab.className = `native-tab active ${st.cls}`;
+    tab.innerHTML = `${cli.icon}<span class="native-tab-title">2  ${session.title}</span>`;
+
+    $('statusBar').innerHTML = `
+      <div class="status-left">
+        <span class="status-cli-chip">${cli.icon}<span>${cli.name}</span></span>
+        <span class="status-session-name" title="${session.title}">${session.title}</span>
+        <span class="state-badge ${st.cls}"><span class="state-dot"></span>${st.label}</span>
+        <span class="origin-chip">
+          <span>${project.name}</span><span class="sep">/</span>
+          <span class="env ${project.wsl ? 'wsl' : ''}">${project.wsl ? 'WSL' : 'PS7'}</span>
+        </span>
+      </div>
+      <div class="status-right">
+        <button class="metric-pill clickable" id="statusTokenBtn" title="点击打开当前会话用量统计">
+          <span class="metric-k">Tokens</span>
+          <span class="metric-v purple">${compactFmt.format(totalTok)}</span>
+        </button>
+        <div class="metric-pill" title="5 小时与 7 天剩余额度">
+          <span class="metric-k">5h</span><span class="metric-v ${toneOf(session.h5)}">${session.h5}%</span>
+          ${session.h5Reset ? `<span class="metric-sub">${session.h5Reset}</span>` : ''}
+          <span style="opacity:.35">|</span>
+          <span class="metric-k">7d</span><span class="metric-v ${toneOf(session.d7)}">${session.d7}%</span>
+          ${session.d7Reset ? `<span class="metric-sub">${session.d7Reset}</span>` : ''}
+        </div>
+        <div class="metric-pill" title="当前模型与上下文占用">
+          <span class="metric-v">${session.model}</span>
+          ${session.effort ? `<span class="metric-v warn">/${session.effort}</span>` : ''}
+          <span style="opacity:.35">·</span>
+          <span class="metric-k">Ctx</span><span class="metric-v accent">${session.context}%</span>
+          <span class="mini-bar"><span class="mini-bar-fill" style="width:${session.context}%;background:${ctxColor}"></span></span>
+        </div>
+        <div class="status-actions">
+          <button class="status-action-btn" title="刷新额度" onclick="showToast('已刷新当前账号在线额度')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+          </button>
+          <button class="status-action-btn ${appState.currentView==='usage'?'active':''}" id="statusUsageBtn" title="当前会话用量统计">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7"/><rect x="13" y="6" width="3" height="11"/></svg>
+          </button>
+          <button class="status-action-btn ${appState.currentView==='history'?'active':''}" id="statusHistoryBtn" title="历史提示词">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+
+    $('statusTokenBtn').addEventListener('click', () => { appState.usage = { projectId: project.id, sessionId: session.id, model: '', period: 'year' }; openView('usage'); });
+    $('statusUsageBtn').addEventListener('click', () => { appState.usage = { projectId: project.id, sessionId: session.id, model: '', period: 'year' }; openView('usage'); });
+    $('statusHistoryBtn').addEventListener('click', () => openView('history'));
+  }
+
+  /* ===== 3. 渲染用量统计弹窗（全圆角下拉 + 三级联动 + 统计条悬浮拆分） ===== */
+  function positionTip(ev) {
+    const tip = $('tooltip');
+    const r = tip.getBoundingClientRect();
+    let left = ev.clientX + 14, top = ev.clientY - r.height - 10;
+    if (left + r.width > window.innerWidth - 10) left = ev.clientX - r.width - 14;
+    if (top < 10) top = ev.clientY + 14;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+
+  function showTip(ev, dateText, rec) {
+    const tip = $('tooltip');
+    tip.innerHTML = `
+      <div style="font-weight:600;margin-bottom:3px">${dateText}</div>
+      <div style="font-family:var(--font-mono);font-weight:700;color:var(--palette-accent);margin-bottom:4px">${exactFmt.format(rec.tokens)} Tokens</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:11px;color:var(--palette-fg-subtle)">
+        <span>输入</span><span style="text-align:right;color:var(--palette-fg-muted)">${exactFmt.format(rec.input)}</span>
+        <span>缓存读取</span><span style="text-align:right;color:var(--palette-fg-muted)">${exactFmt.format(rec.cached)}</span>
+        <span>输出</span><span style="text-align:right;color:var(--palette-fg-muted)">${exactFmt.format(rec.output)}</span>
+      </div>`;
+    tip.classList.add('visible');
+    positionTip(ev);
+  }
+
+  function showSegmentTip(ev, segKey, segTitle, segColor, segTotal, grandTotal, modelRows) {
+    const tip = $('tooltip');
+    const pct = grandTotal > 0 ? ((segTotal / grandTotal) * 100).toFixed(1) : '0.0';
+    const breakdown = modelRows.map(m => {
+      const val = m[segKey] || 0;
+      const mPct = segTotal > 0 ? ((val / segTotal) * 100).toFixed(1) : '0.0';
+      const col = MODEL_COLORS[m.model] || 'var(--palette-accent)';
+      return `
+        <span style="display:inline-flex;align-items:center;gap:5px"><i style="width:6px;height:6px;border-radius:50%;background:${col};display:inline-block"></i>${m.model}</span>
+        <span style="text-align:right;color:var(--palette-fg-muted)">${compactFmt.format(val)} <small style="color:var(--palette-fg-subtle)">(${mPct}%)</small></span>
+      `;
+    }).join('');
+    tip.innerHTML = `
+      <div style="display:flex;align-items:center;gap:6px;font-weight:600;margin-bottom:3px">
+        <span style="width:8px;height:8px;border-radius:2px;background:${segColor};display:inline-block"></span>
+        <span>${segTitle}</span>
+      </div>
+      <div style="font-family:var(--font-mono);font-weight:700;color:var(--palette-fg);margin-bottom:5px">
+        ${exactFmt.format(segTotal)} Tokens <span style="color:var(--palette-accent);font-weight:600">(${pct}%)</span>
+      </div>
+      <div style="border-top:1px solid var(--palette-line);padding-top:5px;margin-top:2px;font-size:10.5px;color:var(--palette-fg-faint);margin-bottom:3px">各模型在该项中的占比：</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 14px;font-size:11px;color:var(--palette-fg-subtle)">
+        ${breakdown}
+      </div>
+    `;
+    tip.classList.add('visible');
+    positionTip(ev);
+  }
+
+  function showModelTip(ev, row, grandTotal) {
+    const tip = $('tooltip');
+    const share = grandTotal > 0 ? ((row.tokens / grandTotal) * 100).toFixed(1) : '0.0';
+    const col = MODEL_COLORS[row.model] || 'var(--palette-accent)';
+    const pIn = row.tokens > 0 ? ((row.input / row.tokens) * 100).toFixed(1) : '0.0';
+    const pCa = row.tokens > 0 ? ((row.cached / row.tokens) * 100).toFixed(1) : '0.0';
+    const pOut = row.tokens > 0 ? ((row.output / row.tokens) * 100).toFixed(1) : '0.0';
+    tip.innerHTML = `
+      <div style="display:flex;align-items:center;gap:6px;font-weight:600;margin-bottom:3px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${col};display:inline-block"></span>
+        <span style="font-family:var(--font-mono)">${row.model}</span>
+      </div>
+      <div style="font-family:var(--font-mono);font-weight:700;color:var(--palette-accent);margin-bottom:5px">
+        ${exactFmt.format(row.tokens)} Tokens <span style="color:var(--palette-fg-subtle);font-weight:500">（占总用量 ${share}%）</span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:11px;color:var(--palette-fg-subtle)">
+        <span>输入</span><span style="text-align:right;color:var(--palette-fg-muted)">${exactFmt.format(row.input)} (${pIn}%)</span>
+        <span>缓存读取</span><span style="text-align:right;color:var(--palette-fg-muted)">${exactFmt.format(row.cached)} (${pCa}%)</span>
+        <span>输出</span><span style="text-align:right;color:var(--palette-fg-muted)">${exactFmt.format(row.output)} (${pOut}%)</span>
+      </div>
+    `;
+    tip.classList.add('visible');
+    positionTip(ev);
+  }
+
+  function hideTip() { $('tooltip').classList.remove('visible'); }
+
+  function renderUsageModal() {
+    const u = appState.usage;
+    const project = PROJECTS.find(p => p.id === u.projectId) || PROJECTS[1];
+    u.projectId = project.id;
+    if (u.sessionId && !project.sessions.some(s => s.id === u.sessionId)) u.sessionId = '';
+    const curSession = project.sessions.find(s => s.id === u.sessionId);
+
+    const scopedSessions = curSession ? [curSession] : project.sessions;
+    const modelTotals = new Map();
+    for (const s of scopedSessions) {
+      for (const e of s.entries) modelTotals.set(e.model, (modelTotals.get(e.model) || 0) + e.input + e.cached + e.output);
+    }
+    const availModels = [...modelTotals.entries()].sort((a,b) => b[1]-a[1]).map(x => x[0]);
+    if (u.model && !availModels.includes(u.model)) u.model = '';
+
+    $('uProjectBadge').textContent = project.env;
+    renderCustomSelect($('uProjectSelect'), {
+      value: project.id,
+      options: PROJECTS.map(p => ({ value: p.id, label: p.name, meta: p.wsl ? 'WSL' : 'PS7' })),
+      onChange: (val) => { u.projectId = val; u.sessionId = ''; u.model = ''; renderUsageModal(); },
+    });
+
+    $('uSessionBadge').textContent = curSession ? CLI_META[curSession.cli].name : `全部 ${project.sessions.length} 条`;
+    $('uSessionBadge').className = curSession ? 'filter-badge' : 'filter-badge neutral';
+    renderCustomSelect($('uSessionSelect'), {
+      value: u.sessionId,
+      options: [
+        { value: '', label: `全部会话（共 ${project.sessions.length} 条）`, meta: '汇总' },
+        ...project.sessions.map(s => ({ value: s.id, label: s.title, icon: CLI_META[s.cli].icon, meta: CLI_META[s.cli].name })),
+      ],
+      onChange: (val) => { u.sessionId = val; u.model = ''; renderUsageModal(); },
+    });
+
+    $('uModelBadge').textContent = u.model ? '单模型' : (availModels.length > 1 ? `${availModels.length} 个可选` : '仅 1 个');
+    $('uModelBadge').className = u.model ? 'filter-badge' : 'filter-badge neutral';
+    renderCustomSelect($('uModelSelect'), {
+      value: u.model,
+      disabled: availModels.length === 0,
+      options: [
+        { value: '', label: `全部模型${availModels.length ? `（${availModels.length} 个）` : ''}` },
+        ...availModels.map(m => ({ value: m, label: m, meta: compactFmt.format(modelTotals.get(m)) })),
+      ],
+      onChange: (val) => { u.model = val; renderUsageModal(); },
+    });
+
+    $('usageBreadcrumb').innerHTML = `<span>${project.name}</span><span class="sep">/</span><span class="curr">${curSession ? curSession.title : '全部会话'}</span>${u.model ? `<span class="sep">/</span><span class="curr">${u.model}</span>` : ''}`;
+
+    const yearStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() - 364);
+    const monthStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+    const weekStart = new Date(TODAY);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    const starts = { year: yearStart, month: monthStart, week: weekStart };
+    const pSum = { year:{t:0,s:new Set(),d:new Set()}, month:{t:0,s:new Set(),d:new Set()}, week:{t:0,s:new Set(),d:new Set()} };
+    const daily = new Map();
+    const models = new Map();
+    let totIn = 0, totCa = 0, totOut = 0, totAll = 0;
+
+    for (const s of scopedSessions) {
+      for (const e of s.entries) {
+        if (e.date > TODAY.getTime() || e.date < yearStart.getTime()) continue;
+        if (u.model && e.model !== u.model) continue;
+        const tok = e.input + e.cached + e.output;
+        const k = dateKey(new Date(e.date));
+        for (const p of ['year','month','week']) {
+          if (e.date >= starts[p].getTime()) { pSum[p].t += tok; pSum[p].s.add(s.id); pSum[p].d.add(k); }
+        }
+        if (e.date >= starts[u.period].getTime()) {
+          totIn += e.input; totCa += e.cached; totOut += e.output; totAll += tok;
+          const dr = daily.get(k) || { tokens:0, input:0, cached:0, output:0 };
+          dr.tokens += tok; dr.input += e.input; dr.cached += e.cached; dr.output += e.output;
+          daily.set(k, dr);
+          const mr = models.get(e.model) || { model:e.model, tokens:0, input:0, cached:0, output:0 };
+          mr.tokens += tok; mr.input += e.input; mr.cached += e.cached; mr.output += e.output;
+          models.set(e.model, mr);
+        }
+      }
+    }
+
+    const pLabels = { year:'近 12 个月', month:'本月', week:'本周' };
+    $('uSegYear').textContent = pSum.year.t ? compactFmt.format(pSum.year.t) : '0';
+    $('uSegMonth').textContent = pSum.month.t ? compactFmt.format(pSum.month.t) : '0';
+    $('uSegWeek').textContent = pSum.week.t ? compactFmt.format(pSum.week.t) : '0';
+    document.querySelectorAll('#uPeriodGroup button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.period === u.period)));
+
+    const start = starts[u.period];
+    $('uRangeText').textContent = `${dateKey(start)} 至 ${dateKey(TODAY)}`;
+    $('uScopeChip').textContent = curSession ? CLI_META[curSession.cli].name : [...new Set(scopedSessions.map(s => CLI_META[s.cli].name))].join(' · ');
+
+    const modelRows = [...models.values()].sort((a,b) => b.tokens - a.tokens);
+    $('uKpiPeriod').textContent = pLabels[u.period];
+    $('uKpiTokens').textContent = totAll ? compactFmt.format(totAll) : '0';
+    $('uKpiTokensExact').textContent = `${exactFmt.format(totAll)} Tokens`;
+    const cachePct = totAll ? ((totCa / totAll) * 100).toFixed(1) : '0.0';
+    $('uKpiCacheRate').textContent = `${cachePct}%`;
+    $('uKpiCacheSub').textContent = `缓存读取 ${totCa ? compactFmt.format(totCa) : '0'}`;
+    $('uKpiSessions').textContent = curSession ? '1' : String(pSum[u.period].s.size);
+    $('uKpiSessionsSub').textContent = curSession ? `单会话 · ${modelRows.length} 个模型` : `共 ${project.sessions.length} 条会话 · ${modelRows.length} 个模型`;
+    const days = pSum[u.period].d.size;
+    $('uKpiDays').textContent = `${days} 天`;
+    $('uKpiAvg').textContent = `活跃日均 ${days ? compactFmt.format(Math.round(totAll / days)) : '0'}`;
+
+    const peak = Math.max(0, ...[...daily.values()].map(v => v.tokens));
+    $('uChartPeak').textContent = `单日峰值 ${peak ? compactFmt.format(peak) : '0'}`;
+
+    const chartBody = $('uChartBody');
+    if (u.period === 'year') {
+      $('uChartTitle').textContent = '每日 Token 活跃热力图';
+      $('uChartLegend').innerHTML = `<div class="heat-legend"><span>低</span>${[0,1,2,3,4].map(l=>`<span class="heat-cell" data-level="${l}"></span>`).join('')}<span>高</span></div>`;
+      const weeks = [];
+      const cur = new Date(start);
+      cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7));
+      let lastM = -99;
+      while (cur <= TODAY) {
+        const wi = weeks.length;
+        let mLabel = '';
+        const dList = [];
+        for (let i = 0; i < 7; i++) {
+          const vis = cur >= start && cur <= TODAY;
+          if (vis && ((wi === 0 && i === 0) || cur.getDate() === 1) && wi - lastM >= 3) { mLabel = `${cur.getMonth()+1}月`; lastM = wi; }
+          const dk = dateKey(cur);
+          const rec = vis ? (daily.get(dk) || { tokens:0, input:0, cached:0, output:0 }) : null;
+          const lv = rec && rec.tokens > 0 && peak > 0 ? Math.min(4, Math.ceil(4 * Math.sqrt(rec.tokens / peak))) : 0;
+          dList.push({ dk, vis, rec, lv });
+          cur.setDate(cur.getDate() + 1);
+        }
+        weeks.push({ mLabel, dList });
+      }
+      chartBody.innerHTML = `<div class="heatmap-scroll"><div class="heatmap-grid">
+        <div class="heatmap-weekdays"><span></span><span>一</span><span></span><span>三</span><span></span><span>五</span><span></span><span>日</span></div>
+        ${weeks.map(w => `<div class="heatmap-week"><span class="heatmap-month">${w.mLabel}</span>${w.dList.map(d => d.vis
+          ? `<span class="heat-cell" data-level="${d.lv}" data-date="${d.dk}" data-t="${d.rec.tokens}" data-i="${d.rec.input}" data-c="${d.rec.cached}" data-o="${d.rec.output}"></span>`
+          : `<span></span>`).join('')}</div>`).join('')}
+      </div></div>`;
+      const sc = chartBody.querySelector('.heatmap-scroll');
+      if (sc) sc.scrollLeft = sc.scrollWidth;
+      chartBody.querySelectorAll('.heat-cell[data-date]').forEach(el => {
+        el.addEventListener('mousemove', e => showTip(e, el.dataset.date, { tokens:+el.dataset.t, input:+el.dataset.i, cached:+el.dataset.c, output:+el.dataset.o }));
+        el.addEventListener('mouseleave', hideTip);
+      });
+    } else {
+      $('uChartTitle').textContent = u.period === 'week' ? '本周每日消耗分布' : '本月每日消耗分布';
+      $('uChartLegend').innerHTML = `<span class="card-sub">悬停柱体查看当日明细</span>`;
+      const series = [];
+      const dc = new Date(start);
+      const wd = ['日','一','二','三','四','五','六'];
+      while (dc <= TODAY) {
+        const dk = dateKey(dc);
+        series.push({ dk, lbl: u.period==='week' ? `周${wd[dc.getDay()]} ${dc.getMonth()+1}/${dc.getDate()}` : `${dc.getDate()}日`, rec: daily.get(dk) || { tokens:0, input:0, cached:0, output:0 } });
+        dc.setDate(dc.getDate() + 1);
+      }
+      chartBody.innerHTML = `<div class="bar-chart" style="grid-template-columns:repeat(${series.length},minmax(0,1fr))">${series.map((d,i) => {
+        const pct = peak > 0 && d.rec.tokens > 0 ? Math.max(7, Math.round(d.rec.tokens / peak * 100)) : 0;
+        const showLbl = series.length <= 10 || i === 0 || i === series.length - 1 || i % 3 === 0;
+        return `<div class="bar-col" data-date="${d.dk}" data-t="${d.rec.tokens}" data-i="${d.rec.input}" data-c="${d.rec.cached}" data-o="${d.rec.output}">
+          <span class="bar-val">${series.length<=10 && d.rec.tokens ? compactFmt.format(d.rec.tokens) : ''}</span>
+          <div class="bar-track"><div class="bar-fill" style="height:${pct}%"></div></div>
+          <span class="bar-label">${showLbl ? d.lbl : ''}</span>
+        </div>`;
+      }).join('')}</div>`;
+      chartBody.querySelectorAll('.bar-col').forEach(el => {
+        el.addEventListener('mousemove', e => showTip(e, el.dataset.date, { tokens:+el.dataset.t, input:+el.dataset.i, cached:+el.dataset.c, output:+el.dataset.o }));
+        el.addEventListener('mouseleave', hideTip);
+      });
+    }
+
+    $('uModelClearArea').innerHTML = u.model ? `<button class="ui-btn primary" style="height:24px;padding:0 8px;font-size:11px" id="uClearModel">清除模型筛选 (${u.model}) ×</button>` : '';
+    if ($('uClearModel')) $('uClearModel').addEventListener('click', () => { u.model = ''; renderUsageModal(); });
+
+    if (!modelRows.length || !totAll) {
+      $('uModelBriefList').innerHTML = '';
+      $('uComposition').style.display = 'none';
+      $('uModelTable').innerHTML = `<div style="padding:20px;text-align:center;color:var(--palette-fg-subtle)">当前筛选范围在「${pLabels[u.period]}」内暂无 Token 记录。</div>`;
+    } else {
+      $('uComposition').style.display = 'flex';
+      // 标题右侧展示当前统计条涵盖的模型简略信息胶囊
+      $('uModelBriefList').innerHTML = `
+        <span class="filter-badge neutral">共 ${modelRows.length} 个模型</span>
+        ${modelRows.map(r => {
+          const sh = (r.tokens / totAll * 100).toFixed(1);
+          const col = MODEL_COLORS[r.model] || 'var(--palette-accent)';
+          return `
+            <span class="model-brief-chip ${u.model === r.model ? 'active' : ''}" data-brief-model="${r.model}">
+              <span style="width:6px;height:6px;border-radius:50%;background:${col}"></span>
+              <b>${r.model}</b>
+              <span>${compactFmt.format(r.tokens)}</span>
+              <span class="pct">${sh}%</span>
+            </span>
+          `;
+        }).join('')}
+      `;
+
+      $('uModelBriefList').querySelectorAll('[data-brief-model]').forEach(chip => {
+        const mName = chip.dataset.briefModel;
+        const row = modelRows.find(x => x.model === mName);
+        chip.addEventListener('mousemove', e => showModelTip(e, row, totAll));
+        chip.addEventListener('mouseleave', hideTip);
+        chip.addEventListener('click', () => { hideTip(); u.model = u.model === mName ? '' : mName; renderUsageModal(); });
+      });
+
+      const pIn = totIn / totAll * 100, pCa = totCa / totAll * 100, pOut = totOut / totAll * 100;
+      $('uStackedBar').innerHTML = `
+        <div class="stacked-seg seg-input" data-seg="input" style="width:${pIn.toFixed(2)}%"></div>
+        <div class="stacked-seg seg-cached" data-seg="cached" style="width:${pCa.toFixed(2)}%"></div>
+        <div class="stacked-seg seg-output" data-seg="output" style="width:${pOut.toFixed(2)}%"></div>
+      `;
+      $('uCompLegend').innerHTML = `
+        <span class="comp-item" data-seg="input"><span class="comp-dot seg-input"></span>输入 <strong>${compactFmt.format(totIn)}</strong> (${pIn.toFixed(1)}%)</span>
+        <span class="comp-item" data-seg="cached"><span class="comp-dot seg-cached"></span>缓存读取 <strong>${compactFmt.format(totCa)}</strong> (${pCa.toFixed(1)}%)</span>
+        <span class="comp-item" data-seg="output"><span class="comp-dot seg-output"></span>输出 <strong>${compactFmt.format(totOut)}</strong> (${pOut.toFixed(1)}%)</span>`;
+
+      const segConfig = {
+        input:  { title:'输入 (Input Tokens)', color:'var(--palette-accent)', total: totIn },
+        cached: { title:'缓存读取 (Cached Read)', color:'var(--palette-success)', total: totCa },
+        output: { title:'输出 (Output Tokens)', color:'var(--palette-violet)', total: totOut },
+      };
+      document.querySelectorAll('#uStackedBar [data-seg], #uCompLegend [data-seg]').forEach(el => {
+        const k = el.dataset.seg;
+        const cfg = segConfig[k];
+        el.addEventListener('mousemove', e => showSegmentTip(e, k, cfg.title, cfg.color, cfg.total, totAll, modelRows));
+        el.addEventListener('mouseleave', hideTip);
+      });
+
+      $('uModelTable').innerHTML = `<table class="usage-table">
+        <thead><tr><th>模型</th><th>总 Tokens / 占比</th><th>输入</th><th>缓存读取</th><th>输出</th></tr></thead>
+        <tbody>${modelRows.map(r => {
+          const sh = r.tokens / totAll * 100;
+          const col = MODEL_COLORS[r.model] || 'var(--palette-accent)';
+          return `<tr class="${u.model===r.model?'active-row':''}" data-pick-model="${r.model}">
+            <td><div style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:${col}"></span><span class="model-name">${r.model}</span></div><div class="share-bar"><div class="share-fill" style="width:${sh.toFixed(1)}%;background:${col}"></div></div></td>
+            <td style="font-weight:600;color:var(--palette-fg)">${exactFmt.format(r.tokens)} <span style="font-weight:400;color:var(--palette-fg-subtle);font-size:11px">${sh.toFixed(1)}%</span></td>
+            <td>${exactFmt.format(r.input)}</td><td>${exactFmt.format(r.cached)}</td><td>${exactFmt.format(r.output)}</td>
+          </tr>`;
+        }).join('')}</tbody></table>`;
+      $('uModelTable').querySelectorAll('tr[data-pick-model]').forEach(tr => {
+        const mName = tr.dataset.pickModel;
+        const row = modelRows.find(x => x.model === mName);
+        tr.addEventListener('mousemove', e => showModelTip(e, row, totAll));
+        tr.addEventListener('mouseleave', hideTip);
+        tr.addEventListener('click', () => { hideTip(); u.model = u.model === mName ? '' : mName; renderUsageModal(); });
+      });
+    }
+
+    $('uFooterMeta').textContent = curSession
+      ? `单会话视图 · ${CLI_META[curSession.cli].name}`
+      : `已汇总最近 ${project.sessions.length} 条会话${project.missingSessions ? ` · ${project.missingSessions} 条缺少明细` : ''}`;
+  }
+
+  /* ===== 4. 渲染历史提示词抽屉 ===== */
+  function renderHistoryDrawer() {
+    const { session } = getActiveSession();
+    const cli = CLI_META[session.cli];
+    const prompts = session.prompts || [
+      { at:'2026-11-19 08:30', text:`梳理「${session.title}」的改动点并给出回归检查清单。` },
+      { at:'2026-11-18 19:12', text:'先定位核心依赖和边界条件，确认没有引入冗余抽象，再逐步执行修改。' },
+    ];
+    const q = appState.historyQuery.trim().toLowerCase();
+    const filtered = q ? prompts.filter(p => p.text.toLowerCase().includes(q)) : prompts;
+
+    $('historyCliIcon').innerHTML = cli.icon;
+    $('historySessionTitle').textContent = `${cli.name} · ${session.title}`;
+    $('historyCountBadge').textContent = `${filtered.length} 条`;
+
+    $('historyList').innerHTML = filtered.length ? filtered.map((p, idx) => {
+      const key = `${session.id}:${idx}`;
+      const isLong = p.text.length > 70;
+      const expanded = appState.expandedPrompts.has(key);
+      return `
+        <article class="prompt-card">
+          <div class="prompt-meta"><span class="prompt-index">#${String(filtered.length - idx).padStart(2,'0')}</span><time>${p.at}</time></div>
+          <p class="prompt-body ${isLong && !expanded ? 'clamped' : ''}">${p.text}</p>
+          <div class="prompt-foot">
+            ${isLong ? `<button class="text-link-btn" data-toggle-prompt="${key}">${expanded ? '收起全文' : '展开全文'}</button>` : '<span></span>'}
+            <button class="ui-btn ghost" style="height:24px;padding:0 8px;font-size:11px" data-copy-prompt="${idx}">复制</button>
+          </div>
+        </article>`;
+    }).join('') : `<div style="padding:32px;text-align:center;color:var(--palette-fg-subtle)">没有匹配的历史提示词。</div>`;
+
+    $('historyList').querySelectorAll('[data-toggle-prompt]').forEach(btn => btn.addEventListener('click', () => {
+      const k = btn.dataset.togglePrompt;
+      if (appState.expandedPrompts.has(k)) appState.expandedPrompts.delete(k); else appState.expandedPrompts.add(k);
+      renderHistoryDrawer();
+    }));
+    $('historyList').querySelectorAll('[data-copy-prompt]').forEach(btn => btn.addEventListener('click', () => {
+      $('historyCopyStatus').textContent = '已复制到剪贴板';
+      showToast('已复制提示词');
+      setTimeout(() => { if ($('historyCopyStatus')) $('historyCopyStatus').textContent = ''; }, 2000);
+    }));
+  }
+
+  /* ===== 5. 渲染工作台设置 ===== */
+  const SETTINGS_SECTIONS = [
+    { key:'appearance', label:'外观' },
+    { key:'directories', label:'CLI 环境与目录' },
+    { key:'cli', label:'CLI 检测' },
+    { key:'sessions', label:'会话管理' },
+    { key:'shortcuts', label:'快捷键' },
+  ];
+
+  function renderSettingsNav() {
+    $('settingsNav').innerHTML = SETTINGS_SECTIONS.map(sec => `
+      <button class="settings-nav-item ${appState.settingsTab === sec.key ? 'active' : ''}" data-stab="${sec.key}">
+        <span>${sec.label}</span>
+        ${sec.key === 'sessions' && appState.removedSessions.length ? `<span class="settings-nav-badge">${appState.removedSessions.length}</span>` : ''}
+      </button>`).join('');
+    $('settingsNav').querySelectorAll('[data-stab]').forEach(btn => btn.addEventListener('click', () => {
+      closeCustomSelect();
+      appState.settingsTab = btn.dataset.stab;
+      syncNavButtons(`settings:${btn.dataset.stab}`);
+      renderSettingsNav();
+      renderSettingsContent();
+    }));
+  }
+
+  function renderSettingsContent() {
+    const box = $('settingsContent');
+    const tab = appState.settingsTab;
+
+    if (tab === 'appearance') {
+      const groupHtml = (title, items, extraBasic = false) => `
+        <div class="setting-group-card">
+          <div class="setting-group-head"><strong>${title}</strong><small>点击色卡实时预览整套界面</small></div>
+          <div class="theme-grid">
+            ${extraBasic ? `
+              <button class="theme-card" onclick="applyPalette('dark');showToast('已切换：跟随 Tabby')"><span class="theme-swatch"><i style="background:#111821"></i><i style="background:#38bdf8"></i></span><span class="theme-card-name">跟随 Tabby</span></button>
+              <button class="theme-card" onclick="applyPalette('dark');showToast('已切换：随系统模式')"><span class="theme-swatch"><i style="background:#0d1117"></i><i style="background:#ffffff"></i></span><span class="theme-card-name">随系统</span></button>
+            ` : ''}
+            ${items.map(p => `<button class="theme-card ${appState.theme === p.id ? 'active' : ''}" data-pick-theme="${p.id}" title="${p.label}"><span class="theme-swatch"><i style="background:${p.c[0]}"></i><i style="background:${p.c[15]}"></i><i style="background:${p.c[18]}"></i></span><span class="theme-card-name">${p.label}</span></button>`).join('')}
+          </div>
+        </div>`;
+
+      box.innerHTML = `
+        <div><h3 class="settings-section-title">外观与排版</h3><p class="settings-section-desc">自定义工作台字号、字体及配色主题，更改会立即生效。</p></div>
+        <div class="setting-group-card">
+          <div class="typography-grid">
+            <div>
+              <div class="setting-group-head" style="margin-bottom:8px"><strong>工作台字号</strong><span class="size-pill" id="sizeOutput">${appState.fontSize} px</span></div>
+              <div class="segmented">
+                <button type="button" id="fsFollow" aria-pressed="${appState.followFontSize}">跟随 Tabby</button>
+                <button type="button" id="fsCustom" aria-pressed="${!appState.followFontSize}">自定义</button>
+              </div>
+              <div class="slider-box" style="${appState.followFontSize ? 'opacity:.5;pointer-events:none' : ''}">
+                <span style="font-size:11px;color:var(--palette-fg-subtle)">11</span>
+                <input type="range" id="fsSlider" min="11" max="18" value="${appState.fontSize}">
+                <span style="font-size:11px;color:var(--palette-fg-subtle)">18</span>
+              </div>
+            </div>
+            <div>
+              <div class="setting-group-head" style="margin-bottom:8px"><strong>工作台字体</strong><small>支持搜索本机字体</small></div>
+              <div class="font-picker-box">
+                <button type="button" class="cselect-trigger" id="fontPickerBtn">
+                  <span class="cselect-value"><span class="cselect-value-text">${appState.fontFamily || '跟随 Tabby 默认字体'}</span></span>
+                  <span class="cselect-arrow"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg></span>
+                </button>
+                <div class="font-dropdown" id="fontDropdown">
+                  <input class="ui-input" id="fontSearchInput" placeholder="输入字体名称搜索…" style="height:29px">
+                  <div class="font-options" id="fontOptions"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        ${groupHtml('基础主题', PALETTES.filter(p => p.group === 'basic'), true)}
+        ${groupHtml('护眼配色', PALETTES.filter(p => p.group === 'eyecare'))}
+        ${groupHtml('编辑器配色', PALETTES.filter(p => p.group === 'editor'))}
+      `;
+
+      box.querySelectorAll('[data-pick-theme]').forEach(btn => btn.addEventListener('click', () => applyPalette(btn.dataset.pickTheme)));
+      $('fsFollow').addEventListener('click', () => { appState.followFontSize = true; appState.fontSize = 13; document.documentElement.style.setProperty('--ui-size', '13px'); renderSettingsContent(); });
+      $('fsCustom').addEventListener('click', () => { appState.followFontSize = false; renderSettingsContent(); });
+      $('fsSlider').addEventListener('input', (e) => { appState.fontSize = Number(e.target.value); $('sizeOutput').textContent = `${appState.fontSize} px`; document.documentElement.style.setProperty('--ui-size', `${appState.fontSize}px`); });
+
+      const renderFonts = (q = '') => {
+        const list = appState.fontList.filter(f => f.toLowerCase().includes(q.toLowerCase()));
+        $('fontOptions').innerHTML = [
+          !q ? `<button class="font-opt ${!appState.fontFamily ? 'active' : ''}" data-font="">跟随 Tabby 默认字体</button>` : '',
+          ...list.map(f => `<button class="font-opt ${appState.fontFamily === f ? 'active' : ''}" data-font="${f}">${f}</button>`),
+        ].join('') || `<div style="padding:8px;color:var(--palette-fg-subtle);font-size:11.5px">没有匹配的字体</div>`;
+        $('fontOptions').querySelectorAll('[data-font]').forEach(b => b.addEventListener('click', () => {
+          appState.fontFamily = b.dataset.font;
+          $('fontDropdown').classList.remove('open');
+          showToast(`已应用字体：${appState.fontFamily || '跟随 Tabby'}`);
+          renderSettingsContent();
+        }));
+      };
+      $('fontPickerBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const dd = $('fontDropdown');
+        const open = dd.classList.toggle('open');
+        $('fontPickerBtn').setAttribute('aria-expanded', String(open));
+        if (open) { renderFonts(''); $('fontSearchInput').focus(); }
+      });
+      $('fontSearchInput').addEventListener('input', e => renderFonts(e.target.value));
+      return;
+    }
+
+    if (tab === 'directories') {
+      const cli = CLI_META[appState.dirCli];
+      const rows = appState.directories[appState.dirCli] || [];
+      const pref = appState.preferredDirId[appState.dirCli] || 'default';
+      box.innerHTML = `
+        <div><h3 class="settings-section-title">CLI 环境与目录</h3><p class="settings-section-desc">按运行环境配置各 CLI 数据目录与默认启动项，路径右侧实时显示存在状态。</p></div>
+        <div class="setting-group-card">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="filter-field"><span class="filter-label">AI CLI</span><div id="dirCliSelectMount"></div></div>
+            <div class="filter-field"><span class="filter-label">运行环境</span><div id="dirEnvSelectMount"></div></div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <strong>${cli.exec === 'opencode' ? '会话数据库' : '数据目录'}</strong>
+            ${cli.envVar ? `<code class="env-var-code">${cli.envVar}</code>` : `<span class="filter-badge neutral">固定默认路径</span>`}
+          </div>
+          <div style="display:flex;gap:7px">
+            <button class="ui-btn" onclick="showToast('已重新扫描当前环境的项目会话')">刷新会话</button>
+            ${cli.envVar ? `<button class="ui-btn primary" id="toggleAddDirBtn">${appState.dirAdding ? '取消添加' : '+ 添加目录'}</button>` : ''}
+          </div>
+        </div>
+        ${appState.dirAdding ? `
+          <div class="setting-group-card" style="border-color:color-mix(in srgb,var(--palette-accent) 45%,var(--palette-line))">
+            <div style="display:grid;grid-template-columns:1fr 2fr auto;gap:8px;align-items:end">
+              <div class="form-group"><label>目录名称</label><input class="ui-input" id="newDirName" placeholder="例如：测试账号"></div>
+              <div class="form-group"><label>绝对路径</label><input class="ui-input" id="newDirPath" placeholder="例如：D:\\CLI-Data\\codex-dev"></div>
+              <button class="ui-btn primary" id="saveDirBtn" style="height:34px">保存</button>
+            </div>
+          </div>` : ''}
+        <div class="list-card">
+          ${rows.map(r => `
+            <div class="dir-row">
+              <div class="dir-row-top">
+                <strong style="display:flex;align-items:center;gap:7px">${cli.icon}<span>${r.name}</span></strong>
+                <div style="display:flex;align-items:center;gap:8px">
+                  ${cli.envVar && pref === r.id ? `<span class="filter-badge">默认启动</span>` : ''}
+                  ${cli.envVar && pref !== r.id && !r.legacy ? `<button class="ui-btn" style="height:24px;padding:0 8px;font-size:11px" data-set-pref="${r.id}">设为默认启动</button>` : ''}
+                </div>
+              </div>
+              <div class="dir-row-bottom">
+                <code class="code-path">${appState.dirEnv === 'ubuntu' ? r.path.replace(/^C:\\Users\\admin/,'/home/dongdong').replace(/\\/g,'/') : r.path}</code>
+                <span class="state-badge ${r.exists ? 'state-running' : 'state-waiting'}"><span class="state-dot"></span>${r.exists ? '存在' : '不存在'}</span>
+              </div>
+            </div>`).join('')}
+        </div>
+      `;
+
+      renderCustomSelect($('dirCliSelectMount'), {
+        value: appState.dirCli,
+        options: Object.values(CLI_META).map(c => ({ value: c.exec, label: c.name, icon: c.icon, meta: c.exec })),
+        onChange: (val) => { appState.dirCli = val; appState.dirAdding = false; renderSettingsContent(); },
+      });
+      renderCustomSelect($('dirEnvSelectMount'), {
+        value: appState.dirEnv,
+        options: [
+          { value: 'ps7', label: 'PowerShell 7', meta: 'Windows' },
+          { value: 'ubuntu', label: 'WSL · Ubuntu-24.04', meta: 'Linux' },
+        ],
+        onChange: (val) => { appState.dirEnv = val; renderSettingsContent(); },
+      });
+
+      if ($('toggleAddDirBtn')) $('toggleAddDirBtn').addEventListener('click', () => { appState.dirAdding = !appState.dirAdding; renderSettingsContent(); });
+      if ($('saveDirBtn')) $('saveDirBtn').addEventListener('click', () => {
+        const name = $('newDirName').value.trim(), path = $('newDirPath').value.trim();
+        if (!name || !path) return showToast('请填写名称和路径');
+        appState.directories[appState.dirCli].push({ id:'custom-'+Date.now(), name, path, exists:true });
+        appState.dirAdding = false; showToast('已添加新目录'); renderSettingsContent();
+      });
+      box.querySelectorAll('[data-set-pref]').forEach(btn => btn.addEventListener('click', () => {
+        appState.preferredDirId[appState.dirCli] = btn.dataset.setPref; showToast('已设为默认启动目录'); renderSettingsContent();
+      }));
+      return;
+    }
+
+    if (tab === 'cli') {
+      const found = appState.detectedMap[appState.cliDetectEnv] || [];
+      const allClis = Object.values(CLI_META);
+      box.innerHTML = `
+        <div><h3 class="settings-section-title">CLI 可用性检测</h3><p class="settings-section-desc">按所选环境的 PATH 查找命令，项目启动菜单直接复用上次检测缓存。</p></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div id="cliEnvSelectMount" style="width:220px"></div>
+            <span class="filter-badge neutral">已检测到 ${found.length} / ${allClis.length}</span>
+          </div>
+          <button class="ui-btn primary" onclick="showToast('已重新扫描当前环境 PATH')">重新检测</button>
+        </div>
+        <div class="cli-grid">
+          ${allClis.map(c => {
+            const ok = found.includes(c.exec);
+            return `
+              <div class="cli-detect-card">
+                <div class="cli-id">${c.icon}<div><strong>${c.name}</strong><code>${c.exec}</code></div></div>
+                <span class="state-badge ${ok ? 'state-running' : 'state-waiting'}"><span class="state-dot"></span>${ok ? '已检测到' : '未检测到'}</span>
+              </div>`;
+          }).join('')}
+        </div>
+      `;
+      renderCustomSelect($('cliEnvSelectMount'), {
+        value: appState.cliDetectEnv,
+        options: [
+          { value: 'ps7', label: 'PowerShell 7', meta: 'Windows' },
+          { value: 'ubuntu', label: 'WSL · Ubuntu-24.04', meta: 'Linux' },
+        ],
+        onChange: (val) => { appState.cliDetectEnv = val; renderSettingsContent(); },
+      });
+      return;
+    }
+
+    if (tab === 'sessions') {
+      box.innerHTML = `
+        <div><h3 class="settings-section-title">会话管理</h3><p class="settings-section-desc">从侧栏移除的会话保留在此处，随时可重新加回项目树，不会删除本地原始日志。</p></div>
+        ${appState.removedSessions.length ? `<div class="list-card">${appState.removedSessions.map(item => `
+          <div class="list-row">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0">
+              ${CLI_META[item.cli].icon}
+              <div style="min-width:0"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.title}</div><div style="font-size:11.5px;color:var(--palette-fg-subtle)">${item.project} · 移除于 ${item.removedAt}</div></div>
+            </div>
+            <button class="ui-btn primary" data-restore-id="${item.id}">重新添加</button>
+          </div>`).join('')}</div>` : `<div class="setting-group-card" style="align-items:center;padding:30px;text-align:center"><strong style="color:var(--palette-fg-muted)">没有已移除的会话</strong><small style="color:var(--palette-fg-subtle)">从侧栏右键移除的会话将显示在这里。</small></div>`}
+      `;
+      box.querySelectorAll('[data-restore-id]').forEach(btn => btn.addEventListener('click', () => {
+        appState.removedSessions = appState.removedSessions.filter(x => x.id !== btn.dataset.restoreId);
+        showToast('已将该会话重新加回项目树'); renderSettingsNav(); renderSettingsContent();
+      }));
+      return;
+    }
+
+    if (tab === 'shortcuts') {
+      box.innerHTML = `
+        <div><h3 class="settings-section-title">工作台快捷键</h3><p class="settings-section-desc">前往 Tabby 系统设置 →「快捷键」进行绑定，可自动检测冲突组合键。</p></div>
+        <div class="list-card">${appState.shortcuts.map(s => `<div class="list-row"><div><div style="font-weight:600">${s.name}</div><div style="font-size:11.5px;color:var(--palette-fg-subtle)">${s.desc}</div></div><kbd class="kbd-chip ${s.keys==='未设置'?'empty':''}">${s.keys}</kbd></div>`).join('')}</div>`;
+    }
+  }
+
+  function renderShowcaseExtras() {
+    renderCustomSelect($('modalCodexAccountSelect'), {
+      value: appState.modalCodexAccount,
+      options: [
+        { value:'default', label:'默认账号 (~/.codex)', icon: CLI_META.codex.icon, meta:'默认' },
+        { value:'work', label:'工作主号 (D:\\CLI-Data\\codex-work)', icon: CLI_META.codex.icon, meta:'Plus' },
+        { value:'backup', label:'备用测试目录', icon: CLI_META.codex.icon },
+      ],
+      onChange: (val) => { appState.modalCodexAccount = val; renderShowcaseExtras(); },
+    });
+
+    $('showcaseMenus').innerHTML = `
+      <div style="border:1px solid var(--palette-line);border-radius:10px;padding:5px;background:var(--palette-surface)">
+        <div class="ctx-section-title">新建会话</div>
+        <button class="ctx-item" onclick="showToast('启动 Codex')">${CLI_META.codex.icon}Codex <span class="ctx-item-right">账号 ▾</span></button>
+        <button class="ctx-item" onclick="showToast('启动 Antigravity')">${CLI_META.agy.icon}Antigravity</button>
+        <button class="ctx-item" onclick="showToast('启动 Claude Code')">${CLI_META.claude.icon}Claude Code</button>
+        <button class="ctx-item" onclick="showToast('启动 Kimi Code')">${CLI_META.kimi.icon}Kimi Code</button>
+        <div class="ctx-sep"></div>
+        <button class="ctx-item" onclick="showToast('打开自定义命令')">自定义命令与目录…</button>
+      </div>
+      <div style="border:1px solid var(--palette-line);border-radius:10px;padding:5px;background:var(--palette-surface)">
+        <div class="ctx-section-title">会话操作</div>
+        <button class="ctx-item" onclick="showToast('打开或恢复该会话')">打开 / 恢复会话</button>
+        <button class="ctx-item" onclick="openView('usage')">查看用量统计</button>
+        <button class="ctx-item" onclick="openView('history')">查看历史提示词</button>
+        <div class="ctx-sep"></div>
+        <button class="ctx-item danger" onclick="showToast('已从工作台移除该会话')">从工作台移除会话</button>
+      </div>`;
+  }
+
+  /* ===== 动态右键与启动菜单 ===== */
+  function closeCtxMenu() { $('ctxMenu').classList.remove('open'); }
+
+  function openContextMenu(e, type, payload) {
+    e.preventDefault();
+    closeCustomSelect();
+    const menu = $('ctxMenu');
+    let html = '';
+    if (type === 'launcher') {
+      const p = PROJECTS.find(x => x.id === payload);
+      html = `
+        <div class="ctx-section-title">${p.name} · 新建会话</div>
+        <button class="ctx-item" data-act="toast:已启动 Codex">${CLI_META.codex.icon}Codex <span class="ctx-item-right">选账号 ▾</span></button>
+        <button class="ctx-item" data-act="toast:已启动 Antigravity">${CLI_META.agy.icon}Antigravity</button>
+        <button class="ctx-item" data-act="toast:已启动 Claude Code">${CLI_META.claude.icon}Claude Code</button>
+        <button class="ctx-item" data-act="toast:已启动 Kimi Code">${CLI_META.kimi.icon}Kimi Code</button>
+        <button class="ctx-item" data-act="toast:已启动系统终端">系统终端 (${p.env})</button>
+        <div class="ctx-sep"></div>
+        <button class="ctx-item" data-act="view:modals">自定义命令与目录…</button>`;
+    } else if (type === 'project') {
+      const p = PROJECTS.find(x => x.id === payload);
+      html = `
+        <div class="ctx-section-title">项目 · ${p.name}</div>
+        <button class="ctx-item" data-act="view:modals">打开新会话…</button>
+        <button class="ctx-item" data-act="usage-project:${p.id}">查看项目全部用量</button>
+        <div class="ctx-sep"></div>
+        <button class="ctx-item danger" data-act="toast:已从工作台移除项目 ${p.name}">从工作台移除项目</button>`;
+    } else if (type === 'group') {
+      const [, cliKey] = payload.split('|');
+      html = `<div class="ctx-section-title">${CLI_META[cliKey].name} 分组</div><button class="ctx-item" data-act="toast:新建 ${CLI_META[cliKey].name} 会话">${CLI_META[cliKey].icon}新建 ${CLI_META[cliKey].name} 会话</button>`;
+    } else if (type === 'session') {
+      const [pid, sid] = payload.split('|');
+      html = `
+        <div class="ctx-section-title">会话操作</div>
+        <button class="ctx-item" data-act="toast:已聚焦/恢复该会话">打开 / 恢复会话</button>
+        <button class="ctx-item" data-act="usage-session:${pid}|${sid}">查看用量统计</button>
+        <button class="ctx-item" data-act="history-session:${pid}|${sid}">查看历史提示词</button>
+        <div class="ctx-sep"></div>
+        <button class="ctx-item danger" data-act="toast:已从工作台移除会话">从工作台移除会话</button>`;
+    } else if (type === 'add-project') {
+      html = `
+        <div class="ctx-section-title">选择项目运行环境</div>
+        <button class="ctx-item" data-act="toast:已呼出 Windows 文件夹选择器">PowerShell 7 (Windows 目录)</button>
+        <button class="ctx-item" data-act="view:modals">WSL · Ubuntu-24.04</button>`;
+    }
+
+    menu.innerHTML = html;
+    menu.classList.add('open');
+    const r = menu.getBoundingClientRect();
+    let x = e.clientX || 120, y = e.clientY || 120;
+    if (x + r.width > window.innerWidth - 8) x = window.innerWidth - r.width - 8;
+    if (y + r.height > window.innerHeight - 8) y = window.innerHeight - r.height - 8;
+    menu.style.left = Math.max(8, x) + 'px';
+    menu.style.top = Math.max(8, y) + 'px';
+
+    menu.querySelectorAll('[data-act]').forEach(btn => btn.addEventListener('click', () => {
+      const act = btn.dataset.act;
+      closeCtxMenu();
+      if (act.startsWith('toast:')) showToast(act.slice(6));
+      else if (act.startsWith('view:')) openView(act.slice(5));
+      else if (act.startsWith('usage-project:')) { appState.usage = { projectId: act.slice(14), sessionId: '', model: '', period: 'year' }; openView('usage'); }
+      else if (act.startsWith('usage-session:')) { const [pid, sid] = act.slice(14).split('|'); appState.usage = { projectId: pid, sessionId: sid, model: '', period: 'year' }; openView('usage'); }
+      else if (act.startsWith('history-session:')) { const [pid, sid] = act.slice(16).split('|'); appState.activeProjectId = pid; appState.activeSessionId = sid; renderSidebar(); renderStatusBar(); openView('history'); }
+    }));
+  }
+
+  /* ===== 视图切换 ===== */
+  function syncNavButtons(view) { document.querySelectorAll('.proto-nav [data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view)); }
+
+  function closeOverlays() {
+    closeCustomSelect();
+    $('usageBackdrop').classList.remove('open');
+    $('settingsBackdrop').classList.remove('open');
+    $('historyBackdrop').classList.remove('open');
+    $('modalsBackdrop').classList.remove('open');
+    appState.currentView = appState.collapsed ? 'rail' : 'workbench';
+    syncNavButtons(appState.currentView);
+    renderStatusBar();
+  }
+  window.closeOverlays = closeOverlays;
+
+  function openView(view) {
+    closeCtxMenu();
+    closeCustomSelect();
+    $('usageBackdrop').classList.remove('open');
+    $('settingsBackdrop').classList.remove('open');
+    $('historyBackdrop').classList.remove('open');
+    $('modalsBackdrop').classList.remove('open');
+
+    appState.currentView = view;
+    syncNavButtons(view);
+
+    if (view === 'workbench') { appState.collapsed = false; renderSidebar(); }
+    else if (view === 'rail') { appState.collapsed = true; renderSidebar(); }
+    else if (view === 'usage') { appState.collapsed = false; renderSidebar(); renderUsageModal(); $('usageBackdrop').classList.add('open'); }
+    else if (view === 'history') { appState.collapsed = false; renderSidebar(); renderHistoryDrawer(); $('historyBackdrop').classList.add('open'); }
+    else if (view.startsWith('settings:')) {
+      appState.collapsed = false; renderSidebar();
+      appState.settingsTab = view.split(':')[1] || 'appearance';
+      renderSettingsNav(); renderSettingsContent();
+      $('settingsBackdrop').classList.add('open');
+    } else if (view === 'modals') {
+      appState.collapsed = false; renderSidebar(); renderShowcaseExtras();
+      $('modalsBackdrop').classList.add('open');
+    }
+    renderStatusBar();
+  }
+  window.openView = openView;
+  window.applyPalette = applyPalette;
+
+  document.querySelectorAll('.proto-nav [data-view]').forEach(btn => btn.addEventListener('click', () => openView(btn.dataset.view)));
+  $('quickThemeToggle').addEventListener('click', () => {
+    const next = appState.theme === 'light' ? 'dark' : 'light';
+    applyPalette(next);
+    showToast(`已切换为${next === 'light' ? '浅色' : '深色'}主题`);
+  });
+  $('collapseSidebarBtn').addEventListener('click', () => { appState.collapsed = !appState.collapsed; renderSidebar(); syncNavButtons(appState.collapsed ? 'rail' : 'workbench'); });
+  $('treeSearchInput').addEventListener('input', e => { appState.treeQuery = e.target.value; renderSidebar(); });
+  $('openSettingsBtn').addEventListener('click', () => openView('settings:appearance'));
+  $('addProjectBtn').addEventListener('click', e => {
+    const r = e.currentTarget.getBoundingClientRect();
+    openContextMenu({ preventDefault(){}, clientX: r.left, clientY: r.top - 92 }, 'add-project');
+  });
+
+  document.querySelectorAll('#uPeriodGroup button').forEach(btn => btn.addEventListener('click', () => { appState.usage.period = btn.dataset.period; renderUsageModal(); }));
+  $('usageRefreshBtn').addEventListener('click', () => { showToast('已重新扫描本地会话日志'); renderUsageModal(); });
+  $('historySearchInput').addEventListener('input', e => { appState.historyQuery = e.target.value; renderHistoryDrawer(); });
+  $('historyRefreshBtn').addEventListener('click', () => { showToast('已刷新历史提示词'); renderHistoryDrawer(); });
+
+  ['usageBackdrop', 'settingsBackdrop', 'historyBackdrop', 'modalsBackdrop'].forEach(id => {
+    $(id).addEventListener('click', e => { if (e.target === $(id)) closeOverlays(); });
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#cselectPopover') && !e.target.closest('.cselect-trigger')) closeCustomSelect();
+    if (!e.target.closest('#ctxMenu') && !e.target.closest('#addProjectBtn') && !e.target.closest('[data-launch-project]') && !e.target.closest('[data-rail-project]')) closeCtxMenu();
+    if (!e.target.closest('.font-picker-box') && $('fontDropdown')) $('fontDropdown').classList.remove('open');
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCustomSelect(); closeCtxMenu(); closeOverlays(); } });
+
+  applyPalette('dark');
+  renderSidebar();
+  renderStatusBar();
+})();
+</script>
+</body>
+</html>

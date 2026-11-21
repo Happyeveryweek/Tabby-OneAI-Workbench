@@ -5,7 +5,7 @@
 - 界面与交互见 [设计方案](DESIGN.md) 和 [浏览器原型](prototype.html)。
 - 开发范围见 [实施方案](IMPLEMENTATION.md)，已验证的能力见 [路线图](ROADMAP.md)。
 
-## 试用 v0.1
+## 试用 v0.2.12
 
 环境为 Windows、PowerShell 7、Node.js 和官方 Tabby `v1.0.238`。WSL 项目需要已经安装的发行版，AI CLI 在各自运行环境内独立安装。
 
@@ -15,10 +15,22 @@ npm.cmd run build
 .\scripts\Preview-Tabby.ps1
 ```
 
-预览脚本会使用正在运行的 Tabby 安装，也可通过 `-TabbyPath` 指定 `Tabby.exe`。预览窗口每次使用独立配置，路径会输出到终端。打开后点「添加项目」，选择 PowerShell 7 或 WSL，然后点项目旁的「+」选择已检测到的 CLI。自定义命令参数输入 JSON 字符串数组，例如 `["--version"]`。
+预览脚本会使用正在运行的 Tabby 安装，也可通过 `-TabbyPath` 指定 `Tabby.exe`。默认新建独立的 Tabby 配置，路径会输出到终端。要沿用旧预览的项目和任务，先关闭对应的预览窗口，再传入 `-ProfileDirectory '<上次输出的完整路径>'`。
+
+1. 点「添加项目」选择运行环境。PowerShell 7 打开系统文件夹选择器，WSL 输入所选发行版的 Linux 路径。右键项目可选择已检测到的 CLI，右键 CLI 分组可新建会话。安装新 CLI 后可到「设置 → CLI」重新检测。
+2. 在「设置 → CLI 环境与目录」查看 Windows 和各 WSL 发行版的数据路径及存在状态。Codex、Claude Code、Pi、Kimi Code 支持多个目录，可指定默认启动项和刷新历史。Kimi Code 支持读取 `KIMI_CODE_HOME` 和旧版 `KIMI_SHARE_DIR`。
+3. 侧栏按项目和 CLI 分组，每组默认显示最新三条会话，点「更多」查看较早的记录。双击可恢复 Codex、Antigravity、Pi、OpenCode、Claude Code 和 Kimi Code 的历史会话，也可聚焦已打开的会话。会话行右侧显示最近活动时间，已打开的会话标题加粗并带强调色。
+4. Codex、Antigravity 和 Claude Code 状态栏显示可用的 `Model`、`Context`、累计 `Tokens` 和 5 小时／7 天额度。Antigravity 额度随当前模型切换。已绑定的 Kimi 会话可显示日志中提供的模型、Tokens 和上下文字段。
+5. 右键项目或会话可将对应记录从工作台移除。项目可以重新添加原目录，会话可在「设置 → 会话管理」加回。CLI 源文件和已打开的终端由各自应用管理。
+
+Codex 的 `Ready`、`Running` 和 `Waiting` 来自终端标题。Antigravity 的状态与指标来自官方状态栏数据，状态也可从输入区识别。Antigravity 和 Claude Code 的状态栏数据需要当前 CLI 支持 `--settings` 且当前运行环境安装了 Node.js。Pi 和 OpenCode 从 Tabby 的 xterm 读取交互区状态。Claude Code 和 Kimi Code 的活动标签显示 `Online` 和 `Exited`，额度及上下文按 CLI 实际数据展示。
+
+「工作台设置 → 外观」可选择跟随 Tabby、随系统、浅色、深色、6 套护眼配色和 10 套编辑器配色。工作台字体可搜索本机安装的字体，也可跟随 Tabby。工作台字号可跟随 Tabby 全局终端默认字号，也可独立设为 11–24 px。右侧终端的字体、行距与光标在 Tabby 原生设置中调整。
+
+「历史提示词」从会话状态栏下方展开，可预览、展开或右键复制。「用量统计」显示近 12 个月、本月、本周的 Tokens、会话数和活跃天数，并提供每日热力图和模型明细。会话和项目共用同一尺寸，可按模型与时间筛选。项目视图最多读取近期 100 条会话。
 
 ## 本地插件包
 
-构建后执行 `npm.cmd pack` 可生成 `tabby-oneai-0.1.0.tgz`。在 Tabby 的 Settings → Plugins → Open Plugins Directory 下建立 `node_modules/tabby-oneai`，将包内 `package.json` 和 `dist/` 解压到该目录，重开 Tabby 即可加载。首次试用推荐预览脚本。Tabby 的 [插件加载规则](https://github.com/Eugeny/tabby/blob/v1.0.238/HACKING.md#plugins) 说明了插件目录和包关键字。
+构建后执行 `npm.cmd pack --pack-destination artifacts` 可生成 `artifacts/tabby-oneai-0.2.12.tgz`。在 Tabby 的 Settings → Plugins → Open Plugins Directory 下建立 `node_modules/tabby-oneai`，将包内文件解压到该目录，重开 Tabby 即可加载。首次试用可用预览脚本。 [Tabby 插件加载规则](https://github.com/Eugeny/tabby/blob/v1.0.238/HACKING.md#plugins)
 
-项目与任务元数据保存在当前 Tabby 配置的本地存储。使用 Tabby 的原生标签恢复时，插件会尝试关联带有任务 ID 的终端。本期以单窗口、本机 Windows 和顶部标签布局为验收范围。CLI 用量、额度、历史会话恢复与账号配置进入 `v0.2`。
+项目、任务、移除记录与自定义 CLI 目录保存在当前 Tabby 配置的本地存储。各 CLI 管理自己的登录凭据和历史。用量统计读取 Codex、Claude Code、Kimi Code 和 Pi 的本地记录。 [v0.2 验收记录](docs/v0.2-verification.md)

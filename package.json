@@ -1,12 +1,12 @@
 {
   "name": "tabby-oneai",
-  "version": "0.1.0",
+  "version": "0.2.12",
   "private": true,
   "description": "Project-based AI CLI workspace for Tabby",
   "author": "Dongdong",
   "keywords": ["tabby-plugin"],
   "main": "dist/index.js",
-  "files": ["dist"],
+  "files": ["dist", "THIRD_PARTY_NOTICES.md"],
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
