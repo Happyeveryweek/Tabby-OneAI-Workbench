@@ -227,6 +227,7 @@ All hotkeys can be recorded, cleared, or reset to defaults in **Workbench Settin
 
 ## Credits & License
 
-- Portions of the Codex rollout/usage parser, CLI brand artwork, and appearance color palettes are adapted from [OneAI](https://github.com/Qingxuan365/oneAI) (MIT License). The GitHub Copilot icon is from [GitHub Octicons](https://github.com/primer/octicons) (MIT License). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for full notices.
-- Built on top of the official [Tabby](https://github.com/Eugeny/tabby) plugin architecture.
+- **[Qingxuan365/oneAI](https://github.com/Qingxuan365/oneAI)**: Inspired our multi-AI CLI workspace concept; portions of the Codex rollout parser, CLI brand artwork, and appearance color palettes are adapted from OneAI (MIT License).
+- **[stormzhang/token-tracker](https://github.com/stormzhang/token-tracker)**: Inspired the multi-model Token usage analytics dashboard, activity heatmap, and cache-read breakdown presentation.
+- **[Eugeny/tabby](https://github.com/Eugeny/tabby)**: Built on top of the official Tabby plugin architecture. The GitHub Copilot icon is from [GitHub Octicons](https://github.com/primer/octicons) (MIT License). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for full notices.
 - Released under the **MIT License**.

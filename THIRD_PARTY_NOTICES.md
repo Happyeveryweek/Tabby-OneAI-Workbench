@@ -4,6 +4,8 @@ Codex rollout and usage parsing builds on [OneAI](https://github.com/Qingxuan365
 
 The workbench appearance palettes come from OneAI's [theme tokens](https://github.com/Qingxuan365/oneAI/blob/164ad5cdf6c151dc0f5f49114929fadcb0185701/src/renderer/src/index.css) and [theme options](https://github.com/Qingxuan365/oneAI/blob/164ad5cdf6c151dc0f5f49114929fadcb0185701/src/renderer/src/themes.ts).
 
+The multi-CLI token usage analytics dashboard, activity heatmap, and model/cache breakdown visualization draw design inspiration from [token-tracker](https://github.com/stormzhang/token-tracker).
+
 ```text
 MIT License
 

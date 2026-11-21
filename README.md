@@ -227,6 +227,7 @@ Copy-Item -Path dist\* -Destination "$target\dist" -Recurse -Force
 
 ## 致谢与开源许可
 
-- 本项目部分 Codex 会话解析、CLI 品牌图标与主题色板迁移并改编自 [OneAI](https://github.com/Qingxuan365/oneAI)（MIT License），GitHub Copilot 图标来自 [GitHub Octicons](https://github.com/primer/octicons)（MIT License）。完整声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 。
-- 宿主终端扩展能力构建于官方 [Tabby](https://github.com/Eugeny/tabby) 插件架构之上。
+- **[Qingxuan365/oneAI](https://github.com/Qingxuan365/oneAI)**：参考了其多 AI CLI 工作台设计理念，并迁移改编了部分 Codex 会话解析、CLI 品牌图标与主题色板（MIT License）。
+- **[stormzhang/token-tracker](https://github.com/stormzhang/token-tracker)**：参考了其多模型 Token 用量统计看板、活跃热力图与缓存命中拆分的数据呈现设计。
+- **[Eugeny/tabby](https://github.com/Eugeny/tabby)**：宿主终端扩展能力构建于官方 Tabby 插件架构之上；GitHub Copilot 图标来自 [GitHub Octicons](https://github.com/primer/octicons)（MIT License）。完整第三方声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 。
 - 本项目基于 **MIT License** 开源。
