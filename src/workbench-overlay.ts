@@ -112,7 +112,7 @@ interface RemovedProjectGroup {
         nav i { width:1.1em; flex:none; opacity:.85; }
         nav .active { background:var(--palette-selected,color-mix(in srgb,var(--accent) 18%,transparent));
             border-color:color-mix(in srgb,var(--accent) 38%,transparent); color:var(--accent); font-weight:600; }
-        .nav-badge { margin-inline-start:auto; font-family:Consolas,monospace; font-size:var(--oneai-size-small);
+        .nav-badge { margin-inline-start:auto; font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-small);
             padding:0 5px; border-radius:99px; background:color-mix(in srgb,currentColor 9%,transparent); }
 
         .settings-page { padding:18px 20px 22px; min-width:0; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:15px; }
@@ -132,7 +132,7 @@ interface RemovedProjectGroup {
             font-size:var(--oneai-size-meta); }
         .segmented button.active { background:var(--palette-selected,color-mix(in srgb,var(--accent) 18%,transparent));
             border-color:color-mix(in srgb,var(--accent) 42%,transparent); font-weight:600; }
-        .size-pill { font-family:Consolas,monospace; font-size:var(--oneai-size-caption); padding:2px 7px; border-radius:6px;
+        .size-pill { font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-caption); padding:2px 7px; border-radius:6px;
             background:var(--palette-control,transparent); border:1px solid var(--line); color:var(--accent); font-weight:600;
             font-variant-numeric:tabular-nums; }
         .size-actions { display:flex; align-items:center; gap:6px; }
@@ -197,7 +197,7 @@ interface RemovedProjectGroup {
             display:flex; align-items:center; justify-content:space-between; gap:10px; }
         .cli-identity { display:flex; align-items:center; gap:10px; min-width:0; }
         .cli-identity strong { display:block; }
-        .cli-identity code { display:block; font-family:Consolas,monospace; font-size:var(--oneai-size-caption); opacity:.68; }
+        .cli-identity code { display:block; font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-caption); opacity:.68; }
 
         .state-badge { display:inline-flex; align-items:center; gap:5px; height:19px; padding:0 7px; border-radius:999px;
             font-size:var(--oneai-size-small); font-weight:600; white-space:nowrap;
@@ -215,7 +215,7 @@ interface RemovedProjectGroup {
         .removed-main { display:flex; align-items:center; gap:8px; min-width:0; flex:1; }
         .removed-title { font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .removed-actions { display:flex; align-items:center; gap:9px; flex:none; }
-        .removed-time { font-family:Consolas,monospace; font-size:var(--oneai-size-caption); opacity:.68; white-space:nowrap;
+        .removed-time { font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-caption); opacity:.68; white-space:nowrap;
             font-variant-numeric:tabular-nums; }
         .ui-btn-compact { height:26px; padding:0 9px; font-size:var(--oneai-size-caption); border-radius:7px; }
         .removed-row button { flex:none; }
@@ -237,7 +237,7 @@ interface RemovedProjectGroup {
         .group-toggle-btn { display:flex; align-items:center; gap:8px; border:0; background:transparent; padding:2px 4px;
             min-width:0; flex:1; text-align:start; font-weight:600; }
         .group-toggle-btn:hover { background:transparent!important; color:var(--accent); }
-        .env-tag,.cli-tag { display:inline-flex; align-items:center; gap:4px; font-family:Consolas,monospace;
+        .env-tag,.cli-tag { display:inline-flex; align-items:center; gap:4px; font-family:var(--oneai-mono-font,Consolas,monospace);
             font-size:var(--oneai-size-small); padding:1.5px 6px; border-radius:5px; white-space:nowrap; font-weight:500; }
         .env-tag { background:color-mix(in srgb,var(--accent) 13%,transparent); color:var(--accent); }
         .env-tag.win { background:color-mix(in srgb,currentColor 8%,transparent); color:inherit; opacity:.78; }
@@ -256,7 +256,7 @@ interface RemovedProjectGroup {
             font-size:var(--oneai-size-caption); border:1px solid var(--line); background:var(--palette-control,transparent); }
         .cli-filter-pill.active { background:var(--palette-selected,color-mix(in srgb,var(--accent) 18%,transparent));
             border-color:color-mix(in srgb,var(--accent) 44%,transparent); color:var(--accent); font-weight:600; }
-        .cli-filter-pill small { font-family:Consolas,monospace; opacity:.75; }
+        .cli-filter-pill small { font-family:var(--oneai-mono-font,Consolas,monospace); opacity:.75; }
         .search-body { flex:1; min-height:0; overflow-y:auto; padding:12px 18px; display:flex; flex-direction:column; gap:7px; }
         .search-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 13px;
             border:1px solid var(--line); border-radius:9px;
@@ -284,16 +284,16 @@ interface RemovedProjectGroup {
             justify-content:space-between; font-size:var(--oneai-size-caption); opacity:.75;
             background:var(--palette-panel,color-mix(in srgb,currentColor 3%,transparent)); }
 
-        kbd { font-family:Consolas,monospace; font-size:var(--oneai-size-caption); color:inherit;
+        kbd { font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-caption); color:inherit;
             background:var(--palette-control,var(--theme-bg,#161c22)); border:1px solid var(--palette-line-strong,var(--line));
             padding:3px 8px; border-radius:6px; }
         kbd.unbound { border-style:dashed; border-color:var(--line); background:transparent; opacity:.62; }
         .shortcut-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
         .shortcut-info { display:flex; flex-direction:column; gap:2px; min-width:0; }
-        .shortcut-info small { font-size:var(--oneai-size-caption); font-family:Consolas,monospace; }
+        .shortcut-info small { font-size:var(--oneai-size-caption); font-family:var(--oneai-mono-font,Consolas,monospace); }
         .shortcut-controls { display:flex; align-items:center; gap:6px; flex:none; }
         .hotkey-recorder { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 10px; border-radius:7px;
-            font-family:Consolas,monospace; font-size:var(--oneai-size-caption); color:inherit;
+            font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-caption); color:inherit;
             border:1px solid var(--palette-line-strong,var(--line)); background:var(--palette-control,var(--theme-bg,#161c22)); }
         .hotkey-recorder.unbound { border-style:dashed; background:transparent; opacity:.76; }
         .hotkey-recorder.recording { border-color:var(--accent); color:var(--accent);
@@ -486,7 +486,7 @@ interface RemovedProjectGroup {
                                         <input #fontInput type="text" class="font-combo-input"
                                             aria-labelledby="oneai-font-label" aria-autocomplete="list"
                                             [attr.aria-expanded]="fontMenuOpen" aria-controls="oneai-font-menu"
-                                            [placeholder]="i18n.text('默认（Maple Mono NF CN 优先）', 'Default (Maple Mono NF CN · Auto Fallback)')"
+                                            [placeholder]="i18n.text('默认（Noto Sans SC + Cascadia Code）', 'Default (Noto Sans SC · Cascadia Code)')"
                                             [value]="fontInputValue"
                                             (focus)="onFontFocus(fontCombo)"
                                             (click)="onFontClick(fontCombo)"
@@ -508,7 +508,7 @@ interface RemovedProjectGroup {
                                             <button *ngIf="showDefaultFontOption" type="button" class="font-option"
                                                 [attr.aria-pressed]="!appearance.fontFamily" [class.highlighted]="fontHighlight === -1"
                                                 (mousedown)="$event.preventDefault()" (click)="selectAppearanceFont('', fontInput)">
-                                                <span>{{ i18n.text('默认（Maple Mono NF CN 优先）', 'Default (Maple Mono NF CN · Auto Fallback)') }}</span>
+                                                <span>{{ i18n.text('默认（Noto Sans SC + Cascadia Code）', 'Default (Noto Sans SC · Cascadia Code)') }}</span>
                                                 <span *ngIf="!appearance.fontFamily" class="font-check" aria-hidden="true">✓</span>
                                             </button>
                                             <button *ngFor="let font of matchingFonts; let idx = index; trackBy: trackByValue" type="button"
@@ -532,7 +532,7 @@ interface RemovedProjectGroup {
                                             <span class="size-pill spacing-pill">{{ formatLetterSpacing(appearance.letterSpacing, appearance.isAutoLetterSpacing) }}</span>
                                         </span>
                                     </div>
-                                    <small class="muted" style="display:block;margin-bottom:6px">{{ appearance.isWideMonoActive() ? i18n.text('等宽中文默认 -0.9 px 并同步收紧中英文词距，非等宽字体自动回退 0.0 px', 'Auto -0.9 px with tightened space gap for mono CJK fonts; 0.0 px otherwise') : i18n.text('当前字体已自动回退 0.0 px，避免非等宽字符拥挤重叠', 'Auto-adjusted to 0.0 px so proportional UI fonts stay readable') }}</small>
+                                    <small class="muted" style="display:block;margin-bottom:6px">{{ appearance.isWideMonoActive() ? i18n.text('已选等宽中文字体，自动收紧为 -0.9 px 字距与中英文词距', 'Auto -0.9 px spacing for selected wide mono CJK font') : i18n.text('默认双轨比例排版（0.0 px 无需微调）；切换 Maple Mono 等宽字体时将自动优化', 'Dual-track UI & mono typography (0.0 px default); auto-tightens for Maple Mono') }}</small>
                                     <label class="font-size-slider">
                                         <small class="muted">{{ appearanceSpacingRange.min }}</small>
                                         <input type="range" [attr.aria-label]="i18n.text('工作台字间距', 'Letter Spacing')"

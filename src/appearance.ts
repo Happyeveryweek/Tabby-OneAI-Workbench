@@ -77,33 +77,10 @@ export const interfaceFontSizeRange = { min: 11, max: 24 };
 export const defaultMonoLetterSpacing = -0.9;
 export const defaultInterfaceLetterSpacing = 0;
 export const interfaceLetterSpacingRange = { min: -1.2, max: 1.2, step: 0.1 };
-export const systemUiFontStack = '"Segoe UI Variable", "Segoe UI", "HarmonyOS Sans SC", "Sarasa UI SC", "MiSans", "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif';
-export const defaultInterfaceFontStack = `"Maple Mono NF CN", "Maple Mono NF CN Medium", ${systemUiFontStack}`;
+export const systemUiFontStack = '"Segoe UI Variable", "Segoe UI", "Noto Sans SC", "HarmonyOS Sans SC", "Sarasa UI SC", "MiSans", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif';
+export const defaultInterfaceFontStack = systemUiFontStack;
+export const defaultMonoFontStack = '"Cascadia Code", "Cascadia Mono", "JetBrainsMono Nerd Font", "JetBrains Mono", "Sarasa Mono SC", "Maple Mono NF CN", Consolas, "Courier New", monospace';
 const wideMonoFontPattern = /(?:maple\s*mono|sarasa\s*(?:mono|term))/i;
-let cachedMapleMonoInstalled: boolean | undefined;
-
-export function hasWideMonoFallback(): boolean {
-    if (typeof cachedMapleMonoInstalled === 'boolean') return cachedMapleMonoInstalled;
-    if (typeof document === 'undefined') return false;
-    try {
-        const ctx = document.createElement('canvas')?.getContext('2d');
-        if (!ctx) return false;
-        const probe = '测试Tabby一二三WiMm0123';
-        for (const fallback of ['sans-serif', 'monospace', 'serif']) {
-            ctx.font = `16px ${fallback}`;
-            const baseline = ctx.measureText(probe).width;
-            ctx.font = `16px "Maple Mono NF CN", "Maple Mono NF CN Medium", ${fallback}`;
-            if (Math.abs(ctx.measureText(probe).width - baseline) > 0.1) {
-                cachedMapleMonoInstalled = true;
-                return true;
-            }
-        }
-        if (document.fonts?.status === 'loaded') cachedMapleMonoInstalled = false;
-        return false;
-    } catch {
-        return false;
-    }
-}
 
 export const paletteStyles = palettes.map(({ id, mode, colors }) => `
     app-root[data-oneai-theme="${id}"] ${workbenchSurfaces} {
@@ -143,8 +120,7 @@ export class WorkbenchAppearance {
     }
 
     isWideMonoActive(): boolean {
-        if (this.fontFamily) return wideMonoFontPattern.test(this.fontFamily);
-        return hasWideMonoFallback();
+        return Boolean(this.fontFamily) && wideMonoFontPattern.test(this.fontFamily);
     }
 
     get autoLetterSpacing(): number {

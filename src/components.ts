@@ -98,7 +98,7 @@ const theme = `
         .brand-title-row { display:flex; align-items:center; gap:6px; }
         .brand-title-row strong { font-size:calc(var(--oneai-size) * 1.06); font-weight:700; }
         .brand-text small { font-size:var(--oneai-size-caption); opacity:.74; }
-        .version { font:var(--oneai-size-small) var(--oneai-interface-font,Consolas),monospace; padding:1px 5px; border-radius:5px;
+        .version { font:var(--oneai-size-small) var(--oneai-mono-font,Consolas,monospace); padding:1px 5px; border-radius:5px;
             background:color-mix(in srgb,currentColor 8%,transparent); opacity:.78; }
         .sidebar-toggle { width:28px; height:28px; min-height:28px; padding:0; display:grid; place-items:center;
             color:var(--palette-fg-subtle,inherit); flex:none; }
@@ -125,11 +125,11 @@ const theme = `
         .project-title { font-weight:600; }
         .folder-mark { flex:none; width:15px; height:15px; color:var(--oneai-accent); }
         .branch,.runtime-badge { display:inline-flex; flex:none; align-items:center; gap:3px; }
-        .branch { font:var(--oneai-size-caption) var(--oneai-interface-font,Consolas),monospace; color:var(--oneai-purple);
+        .branch { font:var(--oneai-size-caption) var(--oneai-mono-font,Consolas,monospace); color:var(--oneai-purple);
             padding:1.5px 6px; border-radius:999px; background:color-mix(in srgb,var(--oneai-purple) 11%,transparent);
             border:1px solid color-mix(in srgb,var(--oneai-purple) 28%,transparent); max-width:74px; }
         .branch svg,.runtime-badge svg { flex:none; width:10px; height:10px; }
-        .runtime-badge { font:var(--oneai-size-small) var(--oneai-interface-font,Consolas),monospace; padding:1px 4px;
+        .runtime-badge { font:var(--oneai-size-small) var(--oneai-mono-font,Consolas,monospace); padding:1px 4px;
             border-radius:4px; background:color-mix(in srgb,var(--oneai-accent) 13%,transparent); color:var(--oneai-accent); }
         .runtime-badge.windows { background:color-mix(in srgb,currentColor 7%,transparent); color:inherit; opacity:.75; }
         .project-pin { opacity:0; width:22px; height:22px; min-height:22px; padding:0; border-radius:6px;
@@ -1018,11 +1018,11 @@ export class ProjectsComponent implements OnInit, OnDestroy {
             min-width:0; font-size:var(--oneai-size-caption); white-space:nowrap; }
         .origin-project { color:var(--palette-fg-muted,inherit); opacity:.88; }
         .origin-sep { opacity:.4; }
-        .origin-runtime { flex:none; font-family:var(--oneai-interface-font,Consolas),monospace; font-size:var(--oneai-size-small); }
+        .origin-runtime { flex:none; font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-small); }
         .origin-runtime.wsl { color:var(--oneai-accent); }
 
         .metrics { margin-inline-start:auto; display:flex; gap:6px; align-items:center;
-            font:var(--oneai-size-caption) var(--oneai-interface-font,Consolas),monospace; white-space:nowrap; }
+            font:var(--oneai-size-caption) var(--oneai-mono-font,Consolas,monospace); white-space:nowrap; }
         .metric-pill { display:inline-flex; align-items:center; gap:5px; height:26px; padding:0 8px; border-radius:7px;
             background:var(--palette-panel,color-mix(in srgb,currentColor 4%,transparent)); border:1px solid var(--oneai-line);
             font-variant-numeric:tabular-nums; }

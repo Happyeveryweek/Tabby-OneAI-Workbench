@@ -10,7 +10,7 @@ import { CodexService } from './codex';
 import { CliDirectoriesPanel } from './codex-panel';
 import { WorkbenchOverlay } from './workbench-overlay';
 import { SessionPanelComponent } from './session-panel';
-import { defaultInterfaceFontSize, defaultInterfaceFontStack, paletteStyles, systemUiFontStack, WorkbenchAppearance, workbenchSurfaces } from './appearance';
+import { defaultInterfaceFontSize, defaultInterfaceFontStack, defaultMonoFontStack, paletteStyles, systemUiFontStack, WorkbenchAppearance, workbenchSurfaces } from './appearance';
 import { WorkbenchI18n } from './i18n';
 
 const workbenchIconPath = 'M1 2h14v12H1zm1.5 1.5v9h11v-9zM4 5l3 3-3 3-1-1 2-2-2-2zm4 4.5h4V11H8z';
@@ -73,6 +73,7 @@ class WorkbenchLayout implements OnDestroy {
                 --oneai-size-body:calc(var(--oneai-size) * 13 / ${defaultInterfaceFontSize});
                 --oneai-size-heading:calc(var(--oneai-size) * 16 / ${defaultInterfaceFontSize});
                 color-scheme:var(--oneai-scheme); font-family:var(--oneai-interface-font,${defaultInterfaceFontStack}); font-size:var(--oneai-size);
+                --oneai-mono-font:${defaultMonoFontStack};
                 letter-spacing:var(--oneai-interface-letter-spacing,0px);
                 word-spacing:var(--oneai-interface-word-spacing,0px);
             }
@@ -113,7 +114,6 @@ class WorkbenchLayout implements OnDestroy {
         this.hostColors = document.createElement('style');
         document.head.append(this.hostColors, this.css);
         this.theme = this.appearance.changed$.subscribe(this.applyTheme);
-        void document.fonts?.ready?.then(() => this.applyTheme());
         this.zone.runOutsideAngular(() => {
             this.setupTooltips(root);
             this.observer = new MutationObserver(records => {

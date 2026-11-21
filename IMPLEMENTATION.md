@@ -1,4 +1,4 @@
-# TabbyOneAi 实施方案
+# Tabby-OneAI-Workbench 实施方案
 
 保留官方 Tabby 作为终端宿主。插件使用 TypeScript 与宿主的 Angular 运行时。界面以 `DESIGN.md` 和 `prototype.html` 为验收基准。先用本机安装的官方 Tabby 验证，再以本地安装包交付。
 

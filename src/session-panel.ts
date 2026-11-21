@@ -98,7 +98,7 @@ interface FloatingTooltip {
         .segmented button:hover { color:var(--palette-fg,inherit); }
         .segmented button[aria-pressed="true"] { background:var(--palette-selected,color-mix(in srgb,var(--accent) 18%,transparent));
             border-color:color-mix(in srgb,var(--accent) 42%,transparent); color:var(--palette-fg,inherit); font-weight:600; }
-        .seg-val { font-family:Consolas,monospace; font-size:var(--oneai-size-small); font-variant-numeric:tabular-nums;
+        .seg-val { font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-small); font-variant-numeric:tabular-nums;
             padding:1px 5px; border-radius:4px; background:color-mix(in srgb,currentColor 8%,transparent); }
         .segmented button[aria-pressed="true"] .seg-val { background:color-mix(in srgb,var(--accent) 22%,transparent); color:var(--accent); }
         .period-meta { display:flex; align-items:center; gap:8px; font-size:var(--oneai-size-caption); font-variant-numeric:tabular-nums; }
@@ -168,7 +168,7 @@ interface FloatingTooltip {
             background:var(--palette-hover,color-mix(in srgb,currentColor 8%,transparent)); }
         .model-brief-chip.active { background:var(--palette-selected,color-mix(in srgb,var(--accent) 18%,transparent));
             border-color:var(--accent); }
-        .model-brief-chip b { font-family:Consolas,monospace; font-weight:600; }
+        .model-brief-chip b { font-family:var(--oneai-mono-font,Consolas,monospace); font-weight:600; }
         .model-dot { width:7px; height:7px; border-radius:50%; flex:none; display:inline-block; }
 
         .stacked-bar { height:10px; border-radius:99px; overflow:hidden; display:flex; gap:2px;
@@ -192,7 +192,7 @@ interface FloatingTooltip {
         tbody tr:hover { background:var(--palette-hover,color-mix(in srgb,currentColor 6%,transparent)); }
         tbody tr.active-row { background:var(--palette-selected,color-mix(in srgb,var(--accent) 16%,transparent)); }
         tbody tr:last-child td { border-bottom:0; }
-        .model-name { font-family:Consolas,monospace; font-weight:600; }
+        .model-name { font-family:var(--oneai-mono-font,Consolas,monospace); font-weight:600; }
         .share-bar { height:3px; width:110px; border-radius:99px; background:color-mix(in srgb,currentColor 11%,transparent);
             overflow:hidden; margin-top:3px; }
         .share-fill { height:100%; border-radius:99px; }
@@ -215,7 +215,7 @@ interface FloatingTooltip {
         .prompts li { padding:10px 12px; border:1px solid var(--line); border-radius:9px;
             background:var(--palette-elevated,color-mix(in srgb,currentColor 4%,transparent)); display:flex; flex-direction:column; gap:6px; }
         .prompt-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:var(--oneai-size-caption); }
-        .prompt-index { font-family:Consolas,monospace; font-weight:600; color:var(--accent);
+        .prompt-index { font-family:var(--oneai-mono-font,Consolas,monospace); font-weight:600; color:var(--accent);
             background:color-mix(in srgb,var(--accent) 13%,transparent); padding:1px 6px; border-radius:5px; }
         pre { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; color:inherit; font:inherit; line-height:1.55; user-select:text; }
         .prompt-preview { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; }
@@ -238,8 +238,8 @@ interface FloatingTooltip {
             border:1px solid var(--palette-line-strong,var(--line));
             box-shadow:0 12px 32px #0007; font-size:var(--oneai-size-caption); min-width:168px; font-variant-numeric:tabular-nums; }
         .tip-title { display:flex; align-items:center; gap:6px; font-weight:600; margin-bottom:3px; }
-        .tip-title.mono { font-family:Consolas,monospace; }
-        .tip-headline { font-family:Consolas,monospace; font-weight:700; color:var(--accent); margin-bottom:5px; }
+        .tip-title.mono { font-family:var(--oneai-mono-font,Consolas,monospace); }
+        .tip-headline { font-family:var(--oneai-mono-font,Consolas,monospace); font-weight:700; color:var(--accent); margin-bottom:5px; }
         .tip-headline small { color:var(--palette-fg-subtle,inherit); font-weight:500; }
         .tip-section { border-top:1px solid var(--line); padding-top:4px; margin:2px 0 3px;
             font-size:var(--oneai-size-small); color:var(--palette-fg-subtle,inherit); }

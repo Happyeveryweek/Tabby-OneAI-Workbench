@@ -1,6 +1,6 @@
-# TabbyOneAi
+# Tabby-OneAI-Workbench
 
-面向 Windows 桌面 Tabby 的 AI CLI 工作台插件。按目录组织 AI 任务，通过 Tabby 原生终端运行并切换任务。
+面向 Windows 桌面 Tabby 的 AI CLI 工作台插件（npm 插件包名：`tabby-oneai`）。按目录组织 AI 任务，通过 Tabby 原生终端运行并切换任务。
 
 - 界面与交互见 [设计方案](DESIGN.md) 和 [浏览器原型](prototype.html)。
 - 开发范围见 [实施方案](IMPLEMENTATION.md)，已验证的能力见 [路线图](ROADMAP.md)。
@@ -25,7 +25,7 @@ npm.cmd run build
 
 Codex 的 `Ready`、`Running` 和 `Waiting` 来自终端标题。Antigravity 的状态与指标来自官方状态栏数据，状态也可从输入区识别。Antigravity 和 Claude Code 的状态栏数据需要当前 CLI 支持 `--settings` 且当前运行环境安装了 Node.js。Pi 和 OpenCode 从 Tabby 的 xterm 读取交互区状态。Claude Code 和 Kimi Code 的活动标签显示 `Online` 和 `Exited`，额度及上下文按 CLI 实际数据展示。
 
-「工作台设置 → 外观」可选择跟随 Tabby、随系统、浅色、深色、6 套护眼配色和 10 套编辑器配色。工作台字体可搜索本机安装的字体，也可跟随 Tabby。工作台字号可跟随 Tabby 全局终端默认字号，也可独立设为 11–24 px。右侧终端的字体、行距与光标在 Tabby 原生设置中调整。
+「工作台设置 → 外观」可选择跟随 Tabby、浅色、深色、护眼与编辑器配色，以及独立简体中文 / English 语言切换。默认采用 UI 正文（`Segoe UI` + `Noto Sans SC`）与等宽数据徽章（`Cascadia Code` / `JetBrainsMono Nerd Font`）双轨排版、默认独立字号 `13 px` 与 `0.0 px` 字间距无需额外微调；同时支持输入/复制或下拉检索切换本机字体，若手动选用 `Maple Mono` 等宽中文字体将自动应用 `-0.9 px` 字间距与中英文词距优化。右侧终端的字体、行距与光标在 Tabby 原生设置中调整。
 
 「历史提示词」从会话状态栏下方展开，可预览、展开或右键复制。「用量统计」显示近 12 个月、本月、本周的 Tokens、会话数和活跃天数，并提供每日热力图和模型明细。会话和项目共用同一尺寸，可按模型与时间筛选。项目视图最多读取近期 100 条会话。
 

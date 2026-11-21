@@ -58,7 +58,7 @@ interface DirectoryRow { id: string; name: string; directory: string; exists?: b
         .directory-heading,.directory-heading > div,.row-main,.directory-detail { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
         .directory-heading { justify-content:space-between; }
         .directory-heading > div { min-width:0; }
-        .env-var-code { font-family:Consolas,monospace; font-size:var(--oneai-size-caption); color:var(--accent);
+        .env-var-code { font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-caption); color:var(--accent);
             background:color-mix(in srgb,var(--accent) 12%,transparent);
             border:1px solid color-mix(in srgb,var(--accent) 28%,transparent); border-radius:6px; padding:1.5px 6px; overflow-wrap:anywhere; }
         .neutral-pill { font-size:var(--oneai-size-small); padding:1.5px 7px; border-radius:999px;
@@ -89,7 +89,7 @@ interface DirectoryRow { id: string; name: string; directory: string; exists?: b
             color:var(--accent); background:color-mix(in srgb,var(--accent) 14%,transparent);
             border:1px solid color-mix(in srgb,var(--accent) 32%,transparent); white-space:nowrap; }
         .directory-detail { margin-top:6px; justify-content:space-between; }
-        .location { flex:1 1 10em; min-width:0; font-family:Consolas,monospace; font-size:var(--oneai-size-caption);
+        .location { flex:1 1 10em; min-width:0; font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-caption);
             background:color-mix(in srgb,currentColor 5%,transparent); padding:2px 7px; border-radius:6px;
             color:inherit; overflow-wrap:anywhere; user-select:text; }
 

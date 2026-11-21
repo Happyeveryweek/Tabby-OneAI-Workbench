@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TabbyOneAi — 全量界面 UI 重新设计交互原型 v2</title>
+<title>Tabby-OneAI-Workbench — 全量界面 UI 重新设计交互原型 v2</title>
 <style>
   :root {
-    --font-system-sans: "Segoe UI Variable", "Segoe UI", "HarmonyOS Sans SC", "Sarasa UI SC", "MiSans", "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif;
-    --font-default-sans: "Maple Mono NF CN", "Maple Mono NF CN Medium", var(--font-system-sans);
+    --font-system-sans: "Segoe UI Variable", "Segoe UI", "Noto Sans SC", "HarmonyOS Sans SC", "Sarasa UI SC", "MiSans", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif;
+    --font-default-sans: var(--font-system-sans);
     --font-sans: var(--font-default-sans);
-    --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    --font-mono: "Cascadia Code", "Cascadia Mono", "JetBrainsMono Nerd Font", "JetBrains Mono", "Sarasa Mono SC", Consolas, monospace;
     --ui-size: 13px;
-    --ui-spacing: -0.9px;
-    --ui-word-spacing: -2.3px;
+    --ui-spacing: 0px;
+    --ui-word-spacing: 0px;
     --radius-sm: 6px;
     --radius-md: 9px;
     --radius-lg: 13px;
@@ -1276,7 +1276,7 @@
   <!-- 顶部原型导航条 -->
   <nav class="proto-nav" aria-label="原型页面导航">
     <div class="proto-nav-left">
-      <span class="proto-badge">TabbyOneAi 全量 UI 原型 v2</span>
+      <span class="proto-badge">Tabby-OneAI-Workbench 全量 UI 原型 v2</span>
       <button class="proto-btn active" data-view="workbench">主工作台</button>
       <button class="proto-btn" data-view="rail">侧栏折叠态</button>
       <div class="proto-divider"></div>
@@ -2580,7 +2580,7 @@
         </div>`;
 
       const wideMonoRe = /(?:maple\s*mono|sarasa\s*(?:mono|term))/i;
-      const isWideMono = () => !appState.fontFamily || wideMonoRe.test(appState.fontFamily);
+      const isWideMono = () => Boolean(appState.fontFamily) && wideMonoRe.test(appState.fontFamily);
       const effectiveSpacing = () => appState.letterSpacing ?? (isWideMono() ? -0.9 : 0);
       const effectiveWordSpacing = () => (isWideMono() && effectiveSpacing() < 0)
         ? Math.max(-3.6, Math.round(effectiveSpacing() * 2.6 * 10) / 10)
@@ -2623,7 +2623,7 @@
               </div>
               <div class="font-picker-box">
                 <div class="font-combo" id="fontCombo">
-                  <input class="font-combo-input" id="fontSearchInput" value="${appState.fontFamily}" placeholder="默认（Maple Mono NF CN 优先）">
+                  <input class="font-combo-input" id="fontSearchInput" value="${appState.fontFamily}" placeholder="默认（Noto Sans SC + Cascadia Code）">
                   <button type="button" class="font-combo-toggle" id="fontPickerBtn" aria-expanded="false" aria-label="展开字体列表">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
                   </button>
@@ -2641,7 +2641,7 @@
                   <span class="size-pill" id="lsOutput">${appState.letterSpacing === null ? `自动 ${fmtSpacing(effectiveSpacing())}` : fmtSpacing(effectiveSpacing())}</span>
                 </span>
               </div>
-              <div style="font-size:11px;color:var(--palette-fg-subtle);margin-bottom:6px">${isWideMono() ? '等宽中文默认 -0.9 px 并同步收紧中英文词距，非等宽字体自动回退 0.0 px' : '当前字体已自动回退 0.0 px，避免非等宽字符拥挤重叠'}</div>
+              <div style="font-size:11px;color:var(--palette-fg-subtle);margin-bottom:6px">${isWideMono() ? '已选等宽中文字体，自动收紧为 -0.9 px 字距与中英文词距' : '默认双轨比例排版（0.0 px 无需微调）；切换 Maple Mono 等宽字体时将自动优化'}</div>
               <div class="slider-box">
                 <span style="font-size:11px;color:var(--palette-fg-subtle)">-1.2</span>
                 <input type="range" id="lsSlider" min="-1.2" max="1.2" step="0.1" value="${effectiveSpacing()}">
@@ -2670,7 +2670,7 @@
         const needle = q.trim().toLowerCase();
         const list = needle ? appState.fontList.filter(f => f.toLowerCase().includes(needle)) : appState.fontList;
         $('fontOptions').innerHTML = [
-          !needle ? `<button class="font-opt ${!appState.fontFamily ? 'active' : ''}" data-font=""><span>默认（Maple Mono NF CN 优先）</span>${!appState.fontFamily ? '<span>✓</span>' : ''}</button>` : '',
+          !needle ? `<button class="font-opt ${!appState.fontFamily ? 'active' : ''}" data-font=""><span>默认（Noto Sans SC + Cascadia Code）</span>${!appState.fontFamily ? '<span>✓</span>' : ''}</button>` : '',
           ...list.map(f => {
             const active = appState.fontFamily.toLowerCase() === f.toLowerCase();
             return `<button class="font-opt ${active ? 'active' : ''}" data-font="${f}"><span>${f}</span>${active ? '<span>✓</span>' : ''}</button>`;
@@ -2679,7 +2679,7 @@
         $('fontOptions').querySelectorAll('[data-font]').forEach(b => b.addEventListener('click', () => {
           appState.fontFamily = b.dataset.font;
           syncTypographyVars();
-          showToast(`已应用字体：${appState.fontFamily || '默认（Maple Mono NF CN 优先）'}`);
+          showToast(`已应用字体：${appState.fontFamily || '默认（Noto Sans SC + Cascadia Code）'}`);
           renderSettingsContent();
         }));
         if (centerActive) {
