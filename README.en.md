@@ -6,7 +6,7 @@
 
 **[English](README.en.md) | [简体中文](README.md)**
 
-[Why This Plugin?](#why-tabby-oneai-workbench) · [Supported AI CLIs](#supported-ai-clis-capability-matrix) · [Key Features](#key-features) · [Architecture](#architecture--workflow) · [Quick Start](#installation--quick-start) · [Shortcuts](#default-keyboard-shortcuts)
+[Why This Plugin?](#why-tabby-oneai-workbench) · [Supported AI CLIs](#supported-ai-clis) · [Key Features](#key-features) · [Architecture](#architecture--workflow) · [Quick Start](#installation--quick-start) · [Shortcuts](#default-keyboard-shortcuts)
 
 ![Tabby-OneAI-Workbench Main Overview](assets/workbench-overview.png)
 
@@ -16,29 +16,36 @@
 
 Modern AI-assisted engineering rarely relies on a single tool. When you run **Codex**, **Claude Code**, **Antigravity (`agy`)**, **OpenCode**, **GitHub Copilot CLI**, **Pi**, **Kimi Code**, and **Grok Build** across multiple **Windows folders** and **WSL 2 distributions**, you quickly hit a wall between chaotic terminal tabs and restrictive GUI wrappers:
 
-| The Pain Point | How Tabby-OneAI-Workbench Solves It |
-| :--- | :--- |
-| **Tab Chaos Across Windows & WSL**: Once you open a dozen terminal tabs, it is hard to tell which tab belongs to which repo, WSL distro, or AI CLI. Resuming a session from yesterday means hunting for session IDs and typing `--resume <uuid>`. | **Persistent `Project → CLI → Session` Sidebar Tree**: Automatically organizes live tasks and local CLI session histories under their respective Windows (`PS7`) or Linux (`WSL · <distro>`) project directories. Double-click any item to focus a live pane or resume the exact historical session in place. |
-| **GUI Wrappers Break Native CLI Features**: Third-party chat wrappers strip away what makes terminal AI agents powerful -- slash commands, interactive permission prompts (`y/n`), subagent status trees, full-screen diffs, custom keymaps, and native split panes. | **100% Native Tabby Terminal, Zero TUI Compromise**: Every session runs directly inside Tabby's native ConPTY / WSL PTY terminal, living side-by-side with your regular PowerShell 7, WSL `bash`, and SSH tabs. Native split panes (`SplitTabComponent`) and tab recovery work seamlessly. |
-| **Blind Background Execution**: When 3--5 agents run in parallel across background tabs, you cannot easily see which one is still thinking, which one is blocked on a tool-approval prompt (`Waiting`), which one stopped on an error (`Error`), or which one finished with unread output. | **Unified Real-Time Status Engine**: Tracks `Running`, `Waiting`, `Ready`, `Error`, and `Exited` across the tab bar's bottom `.colorbar` (soft same-color breathing animation), the session status bar, sidebar CLI group badges, and session rows -- plus smart `New` unread badges and active-task close confirmation. |
-| **Opaque Token Burn, Context Saturation & Quotas**: Long agent loops quietly exhaust your context window or hit 5-hour / 7-day rate limits, with no unified view of token consumption across CLIs and models. | **Live Telemetry Bar + `1100 × 800` Usage Dashboard**: Displays real-time `Tokens`, `5h / 7d` remaining quota & reset timers, `Model / Effort`, and a 3-color `Ctx` progress bar below the tab bar. Click to open a 3-tier cascading (`Project → Session → Model`) analytics dashboard with a 52-week heatmap, daily bar charts, and cache-read breakdown tooltips. |
+- **End Terminal Tab Chaos → Persistent `Project → CLI → Session` Sidebar Tree**
+  Opening a dozen tabs makes it impossible to tell which tab belongs to which repo, WSL distro, or AI CLI. The workbench automatically groups live tasks and local CLI histories under their Windows (`PS7`) or Linux (`WSL · <distro>`) project directories -- double-click any item to focus a live pane or resume the exact historical session in place.
+- **No Compromised GUI Wrappers → 100% Native Tabby Terminal & Full TUI Fidelity**
+  Third-party chat wrappers strip away slash commands, interactive permission prompts (`y/n`), subagent trees, full-screen diffs, and native split panes. Here every session runs directly inside Tabby's native ConPTY / WSL PTY terminal, side-by-side with your regular PowerShell 7, WSL `bash`, and SSH tabs.
+- **Eliminate Background Blind Spots → 5-State Real-Time Engine & Smart `New` Badges**
+  Tracks `Running`, `Waiting` (tool approval needed), `Ready`, `Error` (turn stopped on error), and `Exited` simultaneously across the tab bar's bottom `.colorbar` (soft same-color breathing glow), the session telemetry bar, sidebar group pills, and session dots. Background completions light up a `New` (`新输出`) badge that clears on focus and never falsely re-triggers.
+- **Turn Opaque Quotas & Token Burn into Live Telemetry → Status Bar + `1100 × 800` Usage Dashboard**
+  View live `Tokens`, `5h / 7d` remaining quota & reset timers, `Model / Effort`, and a 3-color `Ctx` progress bar right below the tab bar. Click to open a 3-tier cascading (`Project → Session → Model`) analytics dashboard with a 52-week heatmap, daily bar charts, and cache-read breakdown tooltips.
 
 ---
 
-## Supported AI CLIs Capability Matrix
+## Supported AI CLIs
 
-The workbench strictly isolates Windows (PowerShell 7) and WSL 2 environments (filtering out mounted `/mnt/*` host binaries inside WSL and VS Code `copilot-shim` stubs while automatically resolving user-level CLI paths such as `~/.opencode/bin`, `~/.local/bin`, `~/.bun/bin`, and `~/.cargo/bin`), showing only the CLIs installed in each project's runtime environment:
+The workbench strictly isolates Windows (PowerShell 7) and WSL 2 environments (filtering out mounted `/mnt/*` host binaries inside WSL and VS Code `copilot-shim` stubs while automatically resolving user-level CLI paths such as `~/.opencode/bin`, `~/.local/bin`, `~/.bun/bin`, and `~/.cargo/bin`), showing only the CLIs installed in each project's runtime environment.
 
-| AI CLI | Executable | Session Discovery & Exact Resume | Real-Time Activity (`Running / Waiting / Ready / Error`) | Live Status Bar Metrics (`Model / Ctx / Tokens / Quota`) | Prompt History Drawer & Usage Dashboard | Multi-Directory / Multi-Account Isolation |
-| :--- | :---: | :--- | :--- | :--- | :---: | :---: |
-| **OpenAI Codex** | `codex` | Local rollout logs + App Server history merge, `codex resume <id>` | Terminal title state + screen idle/interrupt & error verification | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` live & local quota | Full Support | Multiple `CODEX_HOME` scopes |
-| **Antigravity** | `agy` | `~/.gemini/antigravity-cli` session parser, `agy --conversation <id>` | Official statusLine bridge + editor box + background subagent (`/tasks`) tracking | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` dynamic model-family quota | Full Support | Default environment home |
-| **Claude Code** | `claude` | `projects/` JSONL transcript scanner, `claude --resume <id>` | Official statusLine bridge + live terminal editor & error detection | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` rate limits | Full Support | Multiple `CLAUDE_CONFIG_DIR` scopes |
-| **Pi Coding Agent** | `pi` | Session JSONL scanner, `pi --session <id>` | Native `PI_PROGRAM_STATUS=1` (`OSC 7501`) + editor & footer parser | `Model/Effort` · `Ctx %` · `Tokens` (dual JSONL + live footer) | Full Support | Multiple `PI_CODING_AGENT_DIR` scopes |
-| **OpenCode** | `opencode` | `opencode session list / export` (v2 schema compatible), `opencode -s <id>` | Terminal prompt & footer tracking (`esc interrupt` / `Permission required` / `Error`) | `Model/Effort` · `Ctx %` · `Tokens` | Full Support | Default environment home |
-| **Grok Build** | `grok` | `~/.grok/sessions/` scanner, `grok --resume <id>` | Triple-source `OSC 9;4` progress + terminal title + screen parser | `Model/Effort` · `Ctx %` · `Tokens` | Full Support | Default (`GROK_HOME`) |
-| **Kimi Code** | `kimi` | Supports both `KIMI_CODE_HOME` (`wire.jsonl`) and legacy `KIMI_SHARE_DIR` | `OSC 7501` + terminal editor activity & error detection | `Model/Effort` · `Ctx %` · `Tokens` | Full Support | Multiple `KIMI_CODE_HOME` scopes |
-| **GitHub Copilot CLI** | `copilot` | `~/.copilot/session-state/` (`events.jsonl`), `copilot --resume <id>` | Terminal editor activity + `session.error` detection | `Model` · `Ctx %` · `Tokens` | Full Support | Default (`COPILOT_HOME`) |
+**Universal Capabilities Across All 8 CLIs**:
+- **Local History Discovery & Exact Resume**: Automatically scans local transcript directories, resumes historical sessions by ID on double-click, and live-binds newly started sessions after the first turn.
+- **5-State Live Activity & In-Place Self-Update Restart**: Full `Running / Waiting / Ready / Error / Exited` synchronization, plus automatic in-place relaunch in the same tab after an in-CLI self-update (`Update now` / `/update`).
+- **Prompt History Drawer & 3-Tier Usage Analytics**: Every CLI integrates with the slide-out prompt history drawer (search / expand / copy) and the `1100 × 800` token usage analytics dashboard.
+
+| AI CLI | Command | Live Status Bar Telemetry | Multi-Directory Env |
+| :--- | :---: | :--- | :---: |
+| **OpenAI Codex** | `codex` | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` live & local quota | `CODEX_HOME` |
+| **Antigravity** | `agy` | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` dynamic model quota | Default Home |
+| **Claude Code** | `claude` | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` rate limits | `CLAUDE_CONFIG_DIR` |
+| **Pi Coding Agent** | `pi` | `Model/Effort` · `Ctx %` · `Tokens` (JSONL + live footer) | `PI_CODING_AGENT_DIR` |
+| **OpenCode** | `opencode` | `Model/Effort` · `Ctx %` · `Tokens` (v2 export schema) | Default Home |
+| **Grok Build** | `grok` | `Model/Effort` · `Ctx %` · `Tokens` | `GROK_HOME` |
+| **Kimi Code** | `kimi` | `Model/Effort` · `Ctx %` · `Tokens` (new & legacy home) | `KIMI_CODE_HOME` |
+| **GitHub Copilot CLI** | `copilot` | `Model` · `Ctx %` · `Tokens` | `COPILOT_HOME` |
 
 ---
 
@@ -127,44 +134,53 @@ flowchart LR
 ### Prerequisites
 
 - **OS**: Windows 10 / 11 (64-bit)
-- **Host Application**: Official [Tabby](https://tabby.sh/) `v1.0.238`
+- **Host Application**: Official [Tabby](https://tabby.sh/) `v1.0.238+`
 - **Runtime**: Windows PowerShell 7 (`pwsh.exe`) and optional WSL 2 distributions (e.g., `Ubuntu-24.04`)
-- **Build Tooling**: Node.js `18+` (required for building the plugin and running the Antigravity / Claude statusLine bridge)
 
-### Option 1: Build & Install into Your Tabby Plugins Directory (Recommended)
+### Option 1: Install Pre-Built Package from GitHub Releases (Recommended)
+
+No Node.js build required -- download the ready-to-use plugin archive directly:
+
+#### 1. Manual Unzip (3 Steps)
+
+1. Go to [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest) and download **`tabby-oneai-v0.2.13.zip`**;
+2. Press `Win + R`, enter `%APPDATA%\tabby\plugins\node_modules`, and press Enter (create the folder if it does not exist);
+3. Extract the `tabby-oneai` folder from the zip into that directory (so `%APPDATA%\tabby\plugins\node_modules\tabby-oneai\package.json` exists), then restart Tabby. The **AI Workbench (`v0.2.13`)** sidebar will appear on the left.
+
+#### 2. Or One-Line PowerShell Install
+
+Run the following snippet in PowerShell to automatically download and extract the latest release into Tabby's plugins directory:
+
+```powershell
+$plugins = "$env:APPDATA\tabby\plugins\node_modules"
+$zip = "$env:TEMP\tabby-oneai-v0.2.13.zip"
+New-Item -ItemType Directory -Path $plugins -Force | Out-Null
+Invoke-WebRequest -Uri "https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/download/v0.2.13/tabby-oneai-v0.2.13.zip" -OutFile $zip
+Expand-Archive -LiteralPath $zip -DestinationPath $plugins -Force
+Remove-Item -LiteralPath $zip -Force
+```
+
+<details>
+<summary><b>Option 2: Build from Source or Run an Isolated Preview Sandbox (For Developers)</b></summary>
+
+Requires **Node.js `18+`**:
 
 ```powershell
 # 1. Install dependencies and compile TypeScript
 npm.cmd ci
 npm.cmd run build
 
-# 2. (Optional) Pack offline tarball artifacts/tabby-oneai-0.2.13.tgz
-npm.cmd pack --pack-destination artifacts
+# 2. Option A: Launch an isolated preview Tabby window (does not touch your daily Tabby profile)
+.\scripts\Preview-Tabby.ps1
 
-# 3. Sync build output to Tabby's plugins directory
+# 3. Option B: Sync build output to your local Tabby plugins directory
 $target = "$env:APPDATA\tabby\plugins\node_modules\tabby-oneai"
 New-Item -ItemType Directory -Path "$target\dist" -Force | Out-Null
 Copy-Item -LiteralPath package.json, THIRD_PARTY_NOTICES.md -Destination $target -Force
 Copy-Item -Path dist\* -Destination "$target\dist" -Recurse -Force
 ```
 
-Restart or reload your Tabby window. The **AI Workbench (`v0.2.13`)** sidebar will appear on the left.
-
-### Option 2: Launch an Isolated Preview Sandbox (Recommended for Development)
-
-To test or develop the plugin without touching your personal Tabby profile, run the included preview script:
-
-```powershell
-npm.cmd ci
-npm.cmd run build
-.\scripts\Preview-Tabby.ps1
-```
-
-- The script automatically locates your installed `Tabby.exe` (or accepts `-TabbyPath`) and launches a new Tabby instance with an isolated configuration directory under `.tmp`.
-- To reuse projects and session records from a previous preview run, close the preview window first and pass its printed profile path:
-  ```powershell
-  .\scripts\Preview-Tabby.ps1 -ProfileDirectory '<full-preview-profile-path-printed-previously>'
-  ```
+</details>
 
 ---
 

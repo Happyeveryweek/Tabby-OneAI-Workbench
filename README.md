@@ -6,7 +6,7 @@
 
 **[简体中文](README.md) | [English](README.en.md)**
 
-[核心痛点与方案](#为什么需要-tabby-oneai-workbench) · [支持的 8 大 AI CLI](#支持的-8-大-ai-cli-能力矩阵) · [核心特性](#核心特性) · [架构与工作流](#架构与工作流) · [安装与快速开始](#安装与快速开始) · [默认快捷键](#默认快捷键)
+[核心痛点与方案](#为什么需要-tabby-oneai-workbench) · [支持的 8 大 AI CLI](#支持的-8-大-ai-cli) · [核心特性](#核心特性) · [架构与工作流](#架构与工作流) · [安装与快速开始](#安装与快速开始) · [默认快捷键](#默认快捷键)
 
 ![Tabby-OneAI-Workbench 主工作台全景](assets/workbench-overview.png)
 
@@ -14,31 +14,38 @@
 
 ## 为什么需要 Tabby-OneAI-Workbench
 
-当你在日常开发中同时使用 **Codex**、**Claude Code**、**Antigravity (`agy`)**、**OpenCode**、**GitHub Copilot CLI**、**Pi**、**Kimi Code** 或 **Grok Build**，并且项目分散在 **Windows 本地目录**与多个 **WSL 2 发行版**中时，往往会遇到两难困境：
+当你在日常开发中同时使用 **Codex**、**Claude Code**、**Antigravity (`agy`)**、**OpenCode**、**GitHub Copilot CLI**、**Pi**、**Kimi Code** 或 **Grok Build**，并且项目分散在 **Windows 本地目录**与多个 **WSL 2 发行版**中时，往往会遇到以下痛点：
 
-| 传统方式的痛点 | Tabby-OneAI-Workbench 的解法 |
-| :--- | :--- |
-| **原生终端标签混乱**：开十几个标签页后，分不清哪个标签属于哪个项目、哪个 WSL 环境、哪个 AI CLI；关闭窗口后想找回半天前的会话只能手翻历史或手敲 `--resume <uuid>`。 | **「项目 → CLI → 会话」三层常驻工作台**：左侧按项目与运行环境（`PS7` / `WSL · <distro>`）自动归集所有在线任务与本地历史会话，双击即可按原目录、原环境变量与原会话 ID 精准恢复。 |
-| **第三方 GUI 壳阉割原生 CLI 能力**：把 CLI 包装成网页聊天框的客户端，往往会破坏斜杠命令、交互式权限确认（`y/n`）、子 Agent 树、全屏 Diff、Vim 键位与终端原生分屏。 | **100% 原生 Tabby 终端，零功能折损**：每个会话都在 Tabby 原生 ConPTY / WSL PTY 中直接运行，与你的普通 PowerShell 7、WSL `bash`、SSH 标签页及原生分屏（Split Tab）无缝共存。 |
-| **多任务并行时状态盲区**：后台同时跑 3--5 个 Agent 时，不知道哪个还在思考、哪个卡在权限审批（Waiting）、哪个报错停止（Error）、哪个刚跑完有新回复（新输出）。 | **全链路实时状态引擎**：统一识别 `Running`、`Waiting`、`Ready`、`Error`、`Exited`，在顶部标签底条（柔和同色呼吸动效）、会话状态栏、侧栏分组胶囊与会话圆点四处同步联动，后台完成自动亮起「新输出」，聚焦即消。 |
-| **Token 消耗、上下文水位与额度黑盒**：长会话容易不知不觉打满上下文窗口（Context Window）或触发 5 小时 / 7 天限额，跨 CLI 的 Token 消耗也缺乏统一账单。 | **实时指标状态栏 + `1100 × 800` 用量统计面板**：状态栏实时展示 `Tokens`、`5h / 7d` 剩余额度与重置倒计时、`Model / Effort` 及三色预警 `Ctx` 进度条；支持按「项目 → 会话 → 模型」三级级联查看年度热力图与每日/模型消耗明细。 |
+- **告别原生终端标签混乱 → 「项目 → CLI → 会话」三层常驻工作台**
+  传统终端开十几个标签页后，分不清哪个标签属于哪个项目、哪个 WSL 环境或哪个 AI CLI，找回半天前的会话只能手敲 `--resume <uuid>`。本插件在左侧按项目与运行环境（`PS7` / `WSL · <distro>`）自动归集所有在线任务与本地历史会话，双击即可按原目录、原环境变量与原会话 ID 精准恢复。
+- **拒绝第三方 GUI 壳阉割功能 → 100% 原生 Tabby 终端，零 TUI 折损**
+  把 CLI 包装成网页聊天框的客户端往往会破坏斜杠命令、交互式权限确认（`y/n`）、子 Agent 树、全屏 Diff 与终端分屏。本插件让每个会话直接在 Tabby 原生 ConPTY / WSL PTY 中运行，与普通 PowerShell 7、WSL `bash`、SSH 标签页及原生分屏（Split Tab）无缝共存。
+- **消除多任务并行盲区 → 全链路五态实时识别与精准「新输出」提醒**
+  后台同时跑多个 Agent 时，统一识别 `Running`、`Waiting`（等待审批）、`Ready`、`Error`（报错停止）与 `Exited`，在顶部标签底条（柔和同色呼吸动效）、会话状态栏、侧栏分组胶囊与会话圆点四处同步联动；后台任务完成自动亮起「新输出」，查看后切走绝不误复燃。
+- **打破额度与 Token 黑盒 → 实时指标状态栏 + `1100 × 800` 用量统计大盘**
+  状态栏实时展示 `Tokens`、`5h / 7d` 剩余额度与重置倒计时、`Model / Effort` 及三色预警 `Ctx` 上下文进度条；支持按「项目 → 会话 → 模型」三级级联查看 52 周活跃热力图、每日柱状图与缓存命中明细。
 
 ---
 
-## 支持的 8 大 AI CLI 能力矩阵
+## 支持的 8 大 AI CLI
 
-插件严格隔离 Windows（PowerShell 7）与各 WSL 发行版环境（自动过滤 WSL 下挂载的 `/mnt/*` 宿主机路径与 VS Code `copilot-shim` 占位桩，自动补齐 `~/.opencode/bin`、`~/.local/bin`、`~/.bun/bin`、`~/.cargo/bin` 等用户级 CLI 路径），仅展示当前项目环境实际已安装的 CLI：
+插件严格隔离 Windows（PowerShell 7）与各 WSL 发行版环境（自动过滤 WSL 下挂载的 `/mnt/*` 宿主机路径与 VS Code `copilot-shim` 占位桩，自动补齐 `~/.opencode/bin`、`~/.local/bin`、`~/.bun/bin`、`~/.cargo/bin` 等用户级 CLI 路径），仅展示当前项目环境实际已安装的 CLI。
 
-| AI CLI | 命令标识 | 历史会话扫描与精准恢复 | 实时运行状态 (`Running / Waiting / Ready / Error`) | 状态栏实时指标 (`Model / Ctx / Tokens / Quota`) | 历史提示词抽屉 & 用量面板 | 多数据目录 / 多账号隔离 |
-| :--- | :---: | :--- | :--- | :--- | :---: | :---: |
-| **OpenAI Codex** | `codex` | 本地 Rollout + App Server 双路合并，`codex resume <id>` | 终端标题状态 + 屏幕空闲/中断与报错校验 | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` 在线/本地额度 | 完整支持 | 支持多 `CODEX_HOME` |
-| **Antigravity** | `agy` | `~/.gemini/antigravity-cli` 会话解析，`agy --conversation <id>` | 官方状态栏桥接 + 输入区 + 后台子任务（`/tasks`）完成度识别 | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` 多模型家族动态额度 | 完整支持 | 环境默认目录 |
-| **Claude Code** | `claude` | `projects/` JSONL 会话扫描，`claude --resume <id>` | 官方状态栏桥接 + 终端输入区实时状态与报错识别 | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` 额度 | 完整支持 | 支持多 `CLAUDE_CONFIG_DIR` |
-| **Pi Coding Agent** | `pi` | 会话 JSONL 扫描，`pi --session <id>` | 原生 `PI_PROGRAM_STATUS=1` (`OSC 7501`) + 输入区与底栏解析 | `Model/Effort` · `Ctx %` · `Tokens`（JSONL + 底栏实时双路） | 完整支持 | 支持多 `PI_CODING_AGENT_DIR` |
-| **OpenCode** | `opencode` | `opencode session list / export`（兼容 v2 结构），`opencode -s <id>` | 终端交互区状态（`esc interrupt` / `Permission required` / `Error`） | `Model/Effort` · `Ctx %` · `Tokens` | 完整支持 | 环境默认目录 |
-| **Grok Build** | `grok` | `~/.grok/sessions/` 扫描，`grok --resume <id>` | `OSC 9;4` 进度序列 + 终端标题 + 屏幕三路联动 | `Model/Effort` · `Ctx %` · `Tokens` | 完整支持 | 环境默认 (`GROK_HOME`) |
-| **Kimi Code** | `kimi` | 兼容新版 `KIMI_CODE_HOME` (`wire.jsonl`) 与旧版 `KIMI_SHARE_DIR` | `OSC 7501` + 终端输入区实时状态与报错识别 | `Model/Effort` · `Ctx %` · `Tokens` | 完整支持 | 支持多 `KIMI_CODE_HOME` |
-| **GitHub Copilot CLI** | `copilot` | `~/.copilot/session-state/` (`events.jsonl`)，`copilot --resume <id>` | 终端交互区实时状态与 `session.error` 报错识别 | `Model` · `Ctx %` · `Tokens` | 完整支持 | 环境默认 (`COPILOT_HOME`) |
+**8 大 CLI 全量标配能力**：
+- **本地历史扫描与精准恢复**：自动扫描各 CLI 本地会话日志，双击按原会话 ID 无缝续聊；新建会话首次对话后自动绑定底层日志并同步标题。
+- **五态实时状态与自更新原地重进**：统一支持 `Running / Waiting / Ready / Error / Exited` 状态联动，以及 CLI 内置自更新（`Update now` / `/update`）完成后的当前标签页原地自动重启。
+- **历史提示词抽屉与三级用量面板**：全部接入右侧历史提示词抽屉（搜索 / 展开 / 复制）与 `1100 × 800` 三级级联 Token 统计大盘。
+
+| AI CLI | 命令 | 状态栏实时指标 | 多目录 / 多账号变量 |
+| :--- | :---: | :--- | :---: |
+| **OpenAI Codex** | `codex` | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` 在线与本地额度 | `CODEX_HOME` |
+| **Antigravity** | `agy` | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` 多模型家族额度 | 环境默认目录 |
+| **Claude Code** | `claude` | `Model/Effort` · `Ctx %` · `Tokens` · `5h/7d` 额度 | `CLAUDE_CONFIG_DIR` |
+| **Pi Coding Agent** | `pi` | `Model/Effort` · `Ctx %` · `Tokens`（JSONL + 底栏双路） | `PI_CODING_AGENT_DIR` |
+| **OpenCode** | `opencode` | `Model/Effort` · `Ctx %` · `Tokens`（兼容 v2 导出结构） | 环境默认目录 |
+| **Grok Build** | `grok` | `Model/Effort` · `Ctx %` · `Tokens` | `GROK_HOME` |
+| **Kimi Code** | `kimi` | `Model/Effort` · `Ctx %` · `Tokens`（兼容新旧日志目录） | `KIMI_CODE_HOME` |
+| **GitHub Copilot CLI** | `copilot` | `Model` · `Ctx %` · `Tokens` | `COPILOT_HOME` |
 
 ---
 
@@ -127,44 +134,53 @@ flowchart LR
 ### 环境要求
 
 - **操作系统**：Windows 10 / 11（64-bit）
-- **宿主版本**：官方 [Tabby](https://tabby.sh/) `v1.0.238`（已实机完整验收）
-- **运行环境**：Windows PowerShell 7（`pwsh.exe`）及可选的 WSL 2 发行版（如 `Ubuntu-24.04`）
-- **构建依赖**：Node.js `18+`（仅构建插件及运行 Antigravity / Claude 状态栏桥接脚本时需要）
+- **宿主版本**：官方 [Tabby](https://tabby.sh/) `v1.0.238+`
+- **终端环境**：Windows PowerShell 7（`pwsh.exe`）及可选的 WSL 2 发行版（如 `Ubuntu-24.04`）
 
-### 方式一：构建并安装到本机 Tabby 插件目录（日常使用推荐）
+### 方式一：下载 Release 预构建包直接安装（推荐，免编译）
+
+无需安装 Node.js 或自行编译，直接下载打包好的插件即可使用：
+
+#### 1. 图形界面解压安装（3 步完成）
+
+1. 前往 [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest) 下载最新版本的 **`tabby-oneai-v0.2.13.zip`**；
+2. 按 `Win + R` 打开「运行」，输入 `%APPDATA%\tabby\plugins\node_modules` 并回车（若目录不存在请手动创建）；
+3. 将压缩包内的 `tabby-oneai` 文件夹解压到该目录下（确保最终包含 `%APPDATA%\tabby\plugins\node_modules\tabby-oneai\package.json`），重启 Tabby 即可在左侧看到 **AI 工作台 (`v0.2.13`)**。
+
+#### 2. 或使用 PowerShell 一键下载安装
+
+打开 PowerShell 执行以下脚本，即可自动从 GitHub Releases 下载并安装到 Tabby 插件目录：
+
+```powershell
+$plugins = "$env:APPDATA\tabby\plugins\node_modules"
+$zip = "$env:TEMP\tabby-oneai-v0.2.13.zip"
+New-Item -ItemType Directory -Path $plugins -Force | Out-Null
+Invoke-WebRequest -Uri "https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/download/v0.2.13/tabby-oneai-v0.2.13.zip" -OutFile $zip
+Expand-Archive -LiteralPath $zip -DestinationPath $plugins -Force
+Remove-Item -LiteralPath $zip -Force
+```
+
+<details>
+<summary><b>方式二：从源码自行构建或启动独立沙箱调试（面向开发者，点击展开）</b></summary>
+
+需要本机已安装 **Node.js `18+`**：
 
 ```powershell
 # 1. 安装依赖并编译 TypeScript
 npm.cmd ci
 npm.cmd run build
 
-# 2. （可选）生成离线插件包 artifacts/tabby-oneai-0.2.13.tgz
-npm.cmd pack --pack-destination artifacts
+# 2. 方式 A：启动隔离的沙箱 Tabby 预览窗口（不影响个人日常 Tabby 配置）
+.\scripts\Preview-Tabby.ps1
 
-# 3. 同步到本机 Tabby 插件目录
+# 3. 方式 B：同步到本机正式 Tabby 插件目录
 $target = "$env:APPDATA\tabby\plugins\node_modules\tabby-oneai"
 New-Item -ItemType Directory -Path "$target\dist" -Force | Out-Null
 Copy-Item -LiteralPath package.json, THIRD_PARTY_NOTICES.md -Destination $target -Force
 Copy-Item -Path dist\* -Destination "$target\dist" -Recurse -Force
 ```
 
-完成后重启或重载 Tabby 窗口，左侧即可看到 **AI 工作台 (`v0.2.13`)** 常驻侧栏。
-
-### 方式二：使用独立沙箱配置预览（开发调试推荐）
-
-如果你希望在不影响个人日常 Tabby 配置的前提下独立试用或调试插件，直接运行内置预览脚本：
-
-```powershell
-npm.cmd ci
-npm.cmd run build
-.\scripts\Preview-Tabby.ps1
-```
-
-- 该脚本会自动定位本机已安装的 `Tabby.exe`（也可通过 `-TabbyPath` 显式指定），并在临时目录创建一套相互隔离的 Tabby 配置与插件目录启动新窗口。
-- 如需在下次调试时复用上一次预览窗口中的项目与任务记录，先关闭预览窗口，再传入脚本打印的路径：
-  ```powershell
-  .\scripts\Preview-Tabby.ps1 -ProfileDirectory '<上次输出的完整预览配置路径>'
-  ```
+</details>
 
 ---
 
