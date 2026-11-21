@@ -74,9 +74,36 @@ const fontSizeKey = 'tabby-oneai.appearance.font-size.v1';
 const letterSpacingKey = 'tabby-oneai.appearance.letter-spacing.v1';
 export const defaultInterfaceFontSize = 13;
 export const interfaceFontSizeRange = { min: 11, max: 24 };
-export const defaultInterfaceLetterSpacing = -0.4;
+export const defaultMonoLetterSpacing = -0.9;
+export const defaultInterfaceLetterSpacing = 0;
 export const interfaceLetterSpacingRange = { min: -1.2, max: 1.2, step: 0.1 };
-export const defaultInterfaceFontStack = '"Maple Mono NF CN", "Maple Mono NF CN Medium", "Segoe UI Variable", "Segoe UI", "HarmonyOS Sans SC", "Sarasa UI SC", "MiSans", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif';
+export const systemUiFontStack = '"Segoe UI Variable", "Segoe UI", "HarmonyOS Sans SC", "Sarasa UI SC", "MiSans", "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif';
+export const defaultInterfaceFontStack = `"Maple Mono NF CN", "Maple Mono NF CN Medium", ${systemUiFontStack}`;
+const wideMonoFontPattern = /(?:maple\s*mono|sarasa\s*(?:mono|term))/i;
+let cachedMapleMonoInstalled: boolean | undefined;
+
+export function hasWideMonoFallback(): boolean {
+    if (typeof cachedMapleMonoInstalled === 'boolean') return cachedMapleMonoInstalled;
+    if (typeof document === 'undefined') return false;
+    try {
+        const ctx = document.createElement('canvas')?.getContext('2d');
+        if (!ctx) return false;
+        const probe = '测试Tabby一二三WiMm0123';
+        for (const fallback of ['sans-serif', 'monospace', 'serif']) {
+            ctx.font = `16px ${fallback}`;
+            const baseline = ctx.measureText(probe).width;
+            ctx.font = `16px "Maple Mono NF CN", "Maple Mono NF CN Medium", ${fallback}`;
+            if (Math.abs(ctx.measureText(probe).width - baseline) > 0.1) {
+                cachedMapleMonoInstalled = true;
+                return true;
+            }
+        }
+        if (document.fonts?.status === 'loaded') cachedMapleMonoInstalled = false;
+        return false;
+    } catch {
+        return false;
+    }
+}
 
 export const paletteStyles = palettes.map(({ id, mode, colors }) => `
     app-root[data-oneai-theme="${id}"] ${workbenchSurfaces} {
@@ -107,9 +134,32 @@ export class WorkbenchAppearance {
     theme: AppearanceTheme = this.initialTheme();
     fontFamily = storedValue(fontKey);
     fontSize = this.initialFontSize();
-    letterSpacing = this.initialLetterSpacing();
+    private customSpacing = this.initialLetterSpacing();
 
     constructor(@Inject(ConfigService) private readonly config: HostConfig) {}
+
+    get isAutoLetterSpacing(): boolean {
+        return this.customSpacing === undefined;
+    }
+
+    isWideMonoActive(): boolean {
+        if (this.fontFamily) return wideMonoFontPattern.test(this.fontFamily);
+        return hasWideMonoFallback();
+    }
+
+    get autoLetterSpacing(): number {
+        return this.isWideMonoActive() ? defaultMonoLetterSpacing : defaultInterfaceLetterSpacing;
+    }
+
+    get letterSpacing(): number {
+        return this.customSpacing ?? this.autoLetterSpacing;
+    }
+
+    get wordSpacing(): number {
+        const spacing = this.letterSpacing;
+        if (!this.isWideMonoActive() || spacing >= 0) return 0;
+        return Math.max(-3.6, Math.round(spacing * 2.6 * 10) / 10);
+    }
 
     setFontSize(size: number): void {
         if (!Number.isFinite(size)) return;
@@ -129,13 +179,13 @@ export class WorkbenchAppearance {
         if (!Number.isFinite(spacing)) return;
         const clamped = customLetterSpacing(spacing);
         localStorage.setItem(letterSpacingKey, String(clamped));
-        this.letterSpacing = clamped;
+        this.customSpacing = clamped;
         this.changed.next();
     }
 
     resetLetterSpacing(): void {
-        localStorage.setItem(letterSpacingKey, String(defaultInterfaceLetterSpacing));
-        this.letterSpacing = defaultInterfaceLetterSpacing;
+        localStorage.removeItem(letterSpacingKey);
+        this.customSpacing = undefined;
         this.changed.next();
     }
 
@@ -170,10 +220,10 @@ export class WorkbenchAppearance {
         return defaultInterfaceFontSize;
     }
 
-    private initialLetterSpacing(): number {
+    private initialLetterSpacing(): number | undefined {
         const raw = storedValue(letterSpacingKey);
-        if (!raw) return defaultInterfaceLetterSpacing;
+        if (!raw) return undefined;
         const numeric = Number(raw);
-        return Number.isFinite(numeric) ? customLetterSpacing(numeric) : defaultInterfaceLetterSpacing;
+        return Number.isFinite(numeric) ? customLetterSpacing(numeric) : undefined;
     }
 }

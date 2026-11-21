@@ -12,7 +12,7 @@ import type { WorkbenchLanguage } from './i18n';
 import { statusDisplay, taskStatusLabel, WorkspaceService } from './workspace';
 import type { RemovedSession, Task } from './workspace';
 import type { HistoryEntry } from './codex';
-import { defaultInterfaceFontSize, defaultInterfaceLetterSpacing, interfaceFontSizeRange, interfaceLetterSpacingRange, palettes, WorkbenchAppearance } from './appearance';
+import { defaultInterfaceFontSize, interfaceFontSizeRange, interfaceLetterSpacingRange, palettes, WorkbenchAppearance } from './appearance';
 import type { AppearanceTheme } from './appearance';
 
 interface SearchSessionItem {
@@ -151,29 +151,37 @@ interface RemovedProjectGroup {
         .theme-swatch i { flex:1; display:block; }
         .theme-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-        /* 圆角自定义下拉与字体选择器 */
-        .cselect-trigger,.font-trigger { display:flex; align-items:center; justify-content:space-between; gap:8px;
+        /* 圆角自定义下拉与内联字体输入选择器 */
+        .cselect-trigger { display:flex; align-items:center; justify-content:space-between; gap:8px;
             width:100%; height:34px; padding:0 10px; border-radius:9px; text-align:start; min-width:0; }
-        .cselect-trigger[aria-expanded="true"],.font-trigger[aria-expanded="true"] { border-color:var(--accent);
+        .cselect-trigger[aria-expanded="true"] { border-color:var(--accent);
             box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 18%,transparent); }
-        .cselect-trigger span,.font-trigger span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .cselect-popover,.font-menu { position:fixed; inset:auto; margin:0; box-sizing:border-box; z-index:95;
+        .cselect-trigger span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .font-combo { display:flex; align-items:center; gap:4px; width:100%; height:34px; padding:0 4px 0 10px;
+            border-radius:9px; border:1px solid var(--line); box-sizing:border-box; min-width:0;
+            background:var(--palette-control,color-mix(in srgb,currentColor 4%,transparent)); }
+        .font-combo:focus-within { border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 18%,transparent); }
+        .font-combo-input { flex:1; min-width:0; border:0; outline:0; background:transparent; color:inherit; font:inherit; padding:0; }
+        .font-combo-input::placeholder { color:inherit; opacity:.62; }
+        .font-combo-toggle { width:26px; height:26px; min-height:26px; padding:0; border:0; border-radius:6px;
+            display:grid; place-items:center; opacity:.75; flex:none; background:transparent; }
+        .cselect-popover { position:fixed; inset:auto; margin:0; box-sizing:border-box; z-index:120;
             padding:6px; color:inherit; background-color:var(--oneai-opaque-base,light-dark(#f4f7fb,#151d28));
             background-image:linear-gradient(var(--palette-surface,var(--theme-bg-more,#18222e)),var(--palette-surface,var(--theme-bg-more,#18222e)));
-            border:1px solid var(--palette-line-strong,var(--line)); border-radius:11px; box-shadow:0 14px 36px #0007; font:inherit; }
-        .cselect-popover { min-width:200px; display:flex; flex-direction:column; gap:2px; }
+            border:1px solid var(--palette-line-strong,var(--line)); border-radius:11px; box-shadow:0 14px 36px #0007; font:inherit;
+            min-width:200px; display:flex; flex-direction:column; gap:2px; }
         .cselect-option { width:100%; padding:7px 9px; border:0; border-radius:7px; background:transparent;
             display:flex; align-items:center; justify-content:space-between; gap:8px; text-align:start; }
         .cselect-option.selected { background:var(--palette-selected,color-mix(in srgb,var(--accent) 18%,transparent)); font-weight:600; }
-        .font-menu { width:min(280px,calc(100vw - 24px)); }
-        .font-menu:popover-open { display:flex; flex-direction:column; gap:6px; }
-        .font-search { width:100%; min-width:0; height:30px; border-radius:7px; }
-        .font-options { max-height:168px; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:2px; }
-        .font-option { display:block; width:100%; margin:0; padding:6px 8px; border:0; border-radius:7px;
-            text-align:start; background:transparent; overflow-wrap:anywhere; }
+        .font-options { position:relative; max-height:184px; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:2px; }
+        .font-option { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; margin:0;
+            padding:6px 8px; border:1px solid transparent; border-radius:7px; text-align:start; background:transparent; }
+        .font-option > span:first-child { min-width:0; overflow-wrap:anywhere; }
+        .font-check { flex:none; font-size:var(--oneai-size-caption); opacity:.9; }
+        .font-option.highlighted { background:var(--palette-hover,color-mix(in srgb,currentColor 10%,transparent)); }
         .font-option[aria-pressed="true"] { background:var(--palette-selected,color-mix(in srgb,var(--accent) 20%,transparent));
-            color:var(--accent); font-weight:600; }
-        .font-empty { margin:5px 8px; }
+            border-color:color-mix(in srgb,var(--accent) 42%,transparent); color:var(--accent); font-weight:600; }
+        .font-empty { margin:5px 8px; font-size:var(--oneai-size-caption); }
 
         .actions { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
         .neutral-pill { font-size:var(--oneai-size-small); padding:2px 8px; border-radius:999px;
@@ -468,39 +476,63 @@ interface RemovedProjectGroup {
                                 <div class="appearance-font">
                                     <div class="card-head" style="margin-bottom:8px">
                                         <strong id="oneai-font-label">{{ i18n.text('工作台字体', 'Font Family') }}</strong>
-                                        <small>{{ i18n.text('支持搜索 · 自动兜底', 'Search · auto fallback') }}</small>
+                                        <span class="size-actions">
+                                            <button *ngIf="appearance.fontFamily" type="button" class="font-reset-btn"
+                                                (click)="selectAppearanceFont('')">{{ i18n.text('恢复默认', 'Reset') }}</button>
+                                            <small>{{ i18n.text('可输入/复制字体名', 'Type or copy font') }}</small>
+                                        </span>
                                     </div>
-                                    <button #fontTrigger type="button" class="font-trigger" aria-labelledby="oneai-font-label oneai-font-choice"
-                                        [attr.aria-expanded]="fontMenuOpen" aria-controls="oneai-font-menu"
-                                        (click)="openFontMenu(fontTrigger, fontMenu, fontSearch)">
-                                        <span id="oneai-font-choice">{{ appearance.fontFamily || i18n.text('默认（Maple Mono NF CN 优先）', 'Default (Maple Mono NF CN · Auto Fallback)') }}</span>
-                                        <i class="fas fa-angle-down" aria-hidden="true"></i>
-                                    </button>
-                                    <div #fontMenu id="oneai-font-menu" class="font-menu" popover="auto" role="group" [attr.aria-label]="i18n.text('选择工作台字体', 'Choose workbench font')"
-                                        (toggle)="fontMenuOpen = fontMenu.matches(':popover-open')">
-                                        <input #fontSearch type="search" class="font-search" [placeholder]="i18n.text('搜索字体', 'Search fonts')" [attr.aria-label]="i18n.text('搜索字体', 'Search fonts')"
-                                            [value]="fontQuery" (input)="setFontQuery(fontSearch.value)"
-                                            (keydown.arrowdown)="focusFontOption($event, fontMenu)"
-                                            (keydown.enter)="selectMatchingFont($event, fontMenu)">
+                                    <div #fontCombo class="font-combo" (click)="$event.stopPropagation()">
+                                        <input #fontInput type="text" class="font-combo-input"
+                                            aria-labelledby="oneai-font-label" aria-autocomplete="list"
+                                            [attr.aria-expanded]="fontMenuOpen" aria-controls="oneai-font-menu"
+                                            [placeholder]="i18n.text('默认（Maple Mono NF CN 优先）', 'Default (Maple Mono NF CN · Auto Fallback)')"
+                                            [value]="fontInputValue"
+                                            (focus)="onFontFocus(fontCombo)"
+                                            (click)="onFontClick(fontCombo)"
+                                            (input)="onFontInput($any($event.target).value, fontCombo)"
+                                            (keydown)="onFontKeydown($event, fontInput)"
+                                            (blur)="onFontBlur()">
+                                        <button type="button" class="font-combo-toggle" tabindex="-1"
+                                            [attr.aria-label]="i18n.text('展开字体列表', 'Toggle font list')"
+                                            (mousedown)="$event.preventDefault()"
+                                            (click)="toggleFontDropdown(fontCombo, fontInput)">
+                                            <i class="fas fa-angle-down" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div *ngIf="fontMenuOpen" id="oneai-font-menu" class="cselect-popover font-combo-popover" role="listbox"
+                                        [style.left.px]="fontMenuLeft" [style.top.px]="fontMenuTop" [style.bottom]="fontMenuBottom"
+                                        [style.width.px]="fontMenuWidth" [style.max-height.px]="fontMenuMaxHeight"
+                                        (mousedown)="$event.preventDefault()" (click)="$event.stopPropagation()">
                                         <div class="font-options">
-                                            <button *ngIf="!fontQuery.trim()" type="button" class="font-option" [attr.aria-pressed]="!appearance.fontFamily"
-                                                (click)="setAppearanceFont('', fontMenu)">{{ i18n.text('默认（Maple Mono NF CN 优先）', 'Default (Maple Mono NF CN · Auto Fallback)') }}</button>
-                                            <button *ngFor="let font of matchingFonts; trackBy: trackByValue" type="button" class="font-option" [attr.aria-pressed]="font === appearance.fontFamily"
-                                                (click)="setAppearanceFont(font, fontMenu)">{{ font }}</button>
-                                            <p *ngIf="fontQuery.trim() && !matchingFonts.length" class="muted font-empty" role="status">{{ i18n.text('没有匹配的字体', 'No matching fonts') }}</p>
+                                            <button *ngIf="showDefaultFontOption" type="button" class="font-option"
+                                                [attr.aria-pressed]="!appearance.fontFamily" [class.highlighted]="fontHighlight === -1"
+                                                (mousedown)="$event.preventDefault()" (click)="selectAppearanceFont('', fontInput)">
+                                                <span>{{ i18n.text('默认（Maple Mono NF CN 优先）', 'Default (Maple Mono NF CN · Auto Fallback)') }}</span>
+                                                <span *ngIf="!appearance.fontFamily" class="font-check" aria-hidden="true">✓</span>
+                                            </button>
+                                            <button *ngFor="let font of matchingFonts; let idx = index; trackBy: trackByValue" type="button"
+                                                class="font-option" [attr.aria-pressed]="isFontSelected(font)" [class.highlighted]="fontHighlight === idx"
+                                                (mousedown)="$event.preventDefault()" (click)="selectAppearanceFont(font, fontInput)">
+                                                <span>{{ font }}</span>
+                                                <span *ngIf="isFontSelected(font)" class="font-check" aria-hidden="true">✓</span>
+                                            </button>
+                                            <p *ngIf="fontsLoading && !fontFamilies.length" class="muted font-empty" role="status">{{ i18n.text('正在读取本机字体…', 'Loading installed fonts…') }}</p>
+                                            <p *ngIf="fontEditing && fontQuery.trim() && !matchingFonts.length" class="muted font-empty" role="status">{{ i18n.text('按 Enter 使用当前字体名，或清空恢复默认', 'Press Enter to apply custom font name, or clear to reset') }}</p>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div class="appearance-letter-spacing">
-                                    <div class="card-head" style="margin-bottom:8px">
+                                    <div class="card-head" style="margin-bottom:4px">
                                         <strong id="oneai-letter-spacing-label">{{ i18n.text('工作台字间距', 'Letter Spacing') }}</strong>
                                         <span class="size-actions">
-                                            <button *ngIf="appearance.letterSpacing !== defaultLetterSpacing" type="button" class="font-reset-btn"
-                                                (click)="resetAppearanceLetterSpacing()">{{ i18n.text('恢复默认', 'Reset') }}</button>
-                                            <span class="size-pill spacing-pill">{{ formatLetterSpacing(appearance.letterSpacing) }}</span>
+                                            <button *ngIf="!appearance.isAutoLetterSpacing" type="button" class="font-reset-btn"
+                                                (click)="resetAppearanceLetterSpacing()">{{ i18n.text('恢复自动', 'Auto') }}</button>
+                                            <span class="size-pill spacing-pill">{{ formatLetterSpacing(appearance.letterSpacing, appearance.isAutoLetterSpacing) }}</span>
                                         </span>
                                     </div>
+                                    <small class="muted" style="display:block;margin-bottom:6px">{{ appearance.isWideMonoActive() ? i18n.text('等宽中文默认 -0.9 px 并同步收紧中英文词距，非等宽字体自动回退 0.0 px', 'Auto -0.9 px with tightened space gap for mono CJK fonts; 0.0 px otherwise') : i18n.text('当前字体已自动回退 0.0 px，避免非等宽字符拥挤重叠', 'Auto-adjusted to 0.0 px so proportional UI fonts stay readable') }}</small>
                                     <label class="font-size-slider">
                                         <small class="muted">{{ appearanceSpacingRange.min }}</small>
                                         <input type="range" [attr.aria-label]="i18n.text('工作台字间距', 'Letter Spacing')"
@@ -784,9 +816,18 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
     cliEnvTop = 0;
     cliEnvWidth = 210;
     fontFamilies: string[] = [];
+    fontsLoading = false;
     fontQuery = '';
+    fontDraft = '';
+    fontEditing = false;
+    fontHighlight = -2;
     matchingFonts: string[] = [];
     fontMenuOpen = false;
+    fontMenuLeft = 0;
+    fontMenuTop: number | null = 0;
+    fontMenuBottom: string | null = 'auto';
+    fontMenuWidth = 260;
+    fontMenuMaxHeight = 200;
 
     // 会话管理筛选状态（缓存结果避免 Angular CD 循环重算与重建 DOM）
     removedProjectFilter = '';
@@ -817,7 +858,6 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
     readonly appearanceSizeRange = interfaceFontSizeRange;
     readonly defaultSize = defaultInterfaceFontSize;
     readonly appearanceSpacingRange = interfaceLetterSpacingRange;
-    readonly defaultLetterSpacing = defaultInterfaceLetterSpacing;
     readonly shortcuts = workbenchHotkeys;
     readonly cliList = supportedCli;
     readonly icons = { history: 'fa-history', usage: 'fa-chart-bar', settings: 'fa-cog', search: 'fa-search' };
@@ -898,6 +938,8 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
     closeCliEnvMenu(): void {
         this.cliEnvMenuOpen = false;
         this.removedMenu = '';
+        this.fontMenuOpen = false;
+        this.fontEditing = false;
         this.stopHotkeyRecording();
     }
 
@@ -947,6 +989,8 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
             this.error = '';
             this.cliEnvMenuOpen = false;
             this.removedMenu = '';
+            this.fontMenuOpen = false;
+            this.fontEditing = false;
             if (page === 'settings') {
                 this.selectSection(this.section);
             } else if (page === 'search') {
@@ -1117,6 +1161,8 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
         this.hotkeyWarning = '';
         this.cliEnvMenuOpen = false;
         this.removedMenu = '';
+        this.fontMenuOpen = false;
+        this.fontEditing = false;
         if (section === 'sessions') {
             this.manualRemovedGroupState.clear();
             this.rebuildRemovedView();
@@ -1129,13 +1175,7 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
                 this.cdr.detectChanges();
             });
         }
-        if (section === 'appearance' && !this.fontFamilies.length) {
-            void this.workspace.platform.listFonts().then(fonts => {
-                this.fontFamilies = [...new Set(fonts.filter(Boolean))].sort((left, right) => left.localeCompare(right));
-                this.rebuildFontView();
-                this.cdr.detectChanges();
-            }).catch(() => { /* Tabby can still provide the inherited font. */ });
-        }
+        if (section === 'appearance') this.ensureFontsLoaded();
         if (section === 'cli') void this.checkCli();
     }
 
@@ -1407,9 +1447,12 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
         catch { this.error = this.i18n.text('无法保存工作台主题。', 'Unable to save workbench theme.'); }
     }
 
-    setFontQuery(query: string): void {
-        this.fontQuery = query;
-        this.rebuildFontView();
+    get fontInputValue(): string {
+        return this.fontEditing ? this.fontDraft : this.appearance.fontFamily;
+    }
+
+    get showDefaultFontOption(): boolean {
+        return !this.fontEditing || !this.fontQuery.trim();
     }
 
     private rebuildFontView(): void {
@@ -1417,34 +1460,185 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
         this.matchingFonts = query ? this.fontFamilies.filter(font => font.toLocaleLowerCase().includes(query)) : this.fontFamilies;
     }
 
-    openFontMenu(trigger: HTMLButtonElement, menu: HTMLElement, search: HTMLInputElement): void {
-        if (menu.matches(':popover-open')) { menu.hidePopover(); return; }
-        const bounds = trigger.getBoundingClientRect();
-        const above = bounds.top > window.innerHeight - bounds.bottom && window.innerHeight - bounds.bottom < 220;
-        menu.style.maxHeight = `${Math.min(224, above ? bounds.top - 12 : window.innerHeight - bounds.bottom - 12)}px`;
-        menu.style.left = `${Math.min(bounds.left, Math.max(12, window.innerWidth - 292))}px`;
-        menu.style.top = above ? 'auto' : `${bounds.bottom + 4}px`;
-        menu.style.bottom = above ? `${window.innerHeight - bounds.top + 4}px` : 'auto';
-        this.setFontQuery('');
-        search.value = '';
-        if (!menu.isConnected) return;
-        try { menu.showPopover(); } catch { return; }
-        search.focus();
+    private placeFontMenu(anchor: HTMLElement): void {
+        const bounds = anchor.getBoundingClientRect();
+        const belowSpace = window.innerHeight - bounds.bottom - 12;
+        const aboveSpace = bounds.top - 12;
+        const above = belowSpace < 160 && aboveSpace > belowSpace;
+        this.fontMenuWidth = Math.max(bounds.width, 240);
+        this.fontMenuLeft = Math.min(bounds.left, Math.max(12, window.innerWidth - this.fontMenuWidth - 12));
+        this.fontMenuMaxHeight = Math.min(200, Math.max(110, above ? aboveSpace : belowSpace));
+        if (above) {
+            this.fontMenuTop = null;
+            this.fontMenuBottom = `${window.innerHeight - bounds.top + 4}px`;
+        } else {
+            this.fontMenuTop = bounds.bottom + 4;
+            this.fontMenuBottom = 'auto';
+        }
     }
 
-    focusFontOption(event: KeyboardEvent, menu: HTMLElement): void {
-        event.preventDefault();
-        menu.querySelector<HTMLButtonElement>('.font-option')?.focus();
+    private ensureFontsLoaded(): void {
+        if (this.fontFamilies.length || this.fontsLoading) return;
+        this.fontsLoading = true;
+        void this.workspace.platform.listFonts().then(fonts => {
+            this.fontFamilies = [...new Set(fonts.filter(Boolean))].sort((left, right) => left.localeCompare(right));
+            this.fontsLoading = false;
+            this.rebuildFontView();
+            if (!this.fontEditing && this.appearance.fontFamily) {
+                this.fontHighlight = this.selectedFontIndex();
+            }
+            this.cdr.detectChanges();
+            if (this.fontMenuOpen) this.scrollFontOptionIntoView(!this.fontEditing);
+        }).catch(() => {
+            this.fontsLoading = false;
+            this.cdr.detectChanges();
+        });
     }
 
-    selectMatchingFont(event: KeyboardEvent, menu: HTMLElement): void {
-        event.preventDefault();
-        menu.querySelector<HTMLButtonElement>('.font-option')?.click();
+    isFontSelected(font: string): boolean {
+        const current = this.appearance.fontFamily.trim().toLocaleLowerCase();
+        return Boolean(current) && font.toLocaleLowerCase() === current;
     }
 
-    setAppearanceFont(font: string, menu: HTMLElement): void {
+    private selectedFontIndex(): number {
+        const current = this.appearance.fontFamily.trim().toLocaleLowerCase();
+        if (!current) return -1;
+        return this.matchingFonts.findIndex(font => font.toLocaleLowerCase() === current);
+    }
+
+    private scrollFontOptionIntoView(preferSelected: boolean): void {
+        requestAnimationFrame(() => {
+            const menu = this.dialog.nativeElement.querySelector<HTMLElement>('#oneai-font-menu .font-options');
+            if (!menu) return;
+            const target = preferSelected
+                ? (menu.querySelector<HTMLElement>('.font-option[aria-pressed="true"]') ?? menu.querySelector<HTMLElement>('.font-option.highlighted'))
+                : (menu.querySelector<HTMLElement>('.font-option.highlighted') ?? menu.querySelector<HTMLElement>('.font-option[aria-pressed="true"]'));
+            if (!target) return;
+            const targetTop = target.getBoundingClientRect().top - menu.getBoundingClientRect().top + menu.scrollTop;
+            if (preferSelected) {
+                menu.scrollTop = Math.max(0, targetTop - Math.round((menu.clientHeight - target.offsetHeight) / 2));
+                return;
+            }
+            const targetBottom = targetTop + target.offsetHeight;
+            if (targetTop < menu.scrollTop) menu.scrollTop = targetTop;
+            else if (targetBottom > menu.scrollTop + menu.clientHeight) menu.scrollTop = targetBottom - menu.clientHeight;
+        });
+    }
+
+    onFontFocus(anchor: HTMLElement): void {
+        if (!this.fontMenuOpen) this.openFontDropdown(anchor);
+    }
+
+    onFontClick(anchor: HTMLElement): void {
+        if (!this.fontMenuOpen) this.openFontDropdown(anchor);
+    }
+
+    openFontDropdown(anchor: HTMLElement): void {
+        this.ensureFontsLoaded();
+        this.fontEditing = false;
+        this.fontQuery = '';
+        this.rebuildFontView();
+        this.fontHighlight = this.selectedFontIndex();
+        this.placeFontMenu(anchor);
+        this.fontMenuOpen = true;
+        this.cdr.detectChanges();
+        this.scrollFontOptionIntoView(true);
+    }
+
+    toggleFontDropdown(anchor: HTMLElement, input: HTMLInputElement): void {
+        if (this.fontMenuOpen) {
+            this.fontMenuOpen = false;
+            this.fontEditing = false;
+            return;
+        }
+        input.focus();
+        this.openFontDropdown(anchor);
+    }
+
+    onFontInput(value: string, anchor: HTMLElement): void {
+        this.fontEditing = true;
+        this.fontDraft = value;
+        this.fontQuery = value;
+        this.rebuildFontView();
+        this.fontHighlight = this.matchingFonts.length ? 0 : (this.showDefaultFontOption ? -1 : -2);
+        this.placeFontMenu(anchor);
+        this.fontMenuOpen = true;
+    }
+
+    onFontKeydown(event: KeyboardEvent, input: HTMLInputElement): void {
+        const minIdx = this.showDefaultFontOption ? -1 : 0;
+        const maxIdx = this.matchingFonts.length - 1;
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            if (!this.fontMenuOpen) this.openFontDropdown(input.parentElement!);
+            if (maxIdx >= minIdx) {
+                this.fontHighlight = this.fontHighlight < minIdx || this.fontHighlight >= maxIdx ? minIdx : this.fontHighlight + 1;
+                this.scrollFontOptionIntoView(false);
+            }
+            return;
+        }
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            if (!this.fontMenuOpen) this.openFontDropdown(input.parentElement!);
+            if (maxIdx >= minIdx) {
+                this.fontHighlight = this.fontHighlight <= minIdx ? maxIdx : this.fontHighlight - 1;
+                this.scrollFontOptionIntoView(false);
+            }
+            return;
+        }
+        if (event.key === 'Escape' && this.fontMenuOpen) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.fontMenuOpen = false;
+            this.fontEditing = false;
+            return;
+        }
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const raw = (this.fontEditing ? this.fontDraft : input.value).trim();
+            if (!raw) {
+                this.selectAppearanceFont('', input);
+                return;
+            }
+            const exact = this.fontFamilies.find(font => font.toLocaleLowerCase() === raw.toLocaleLowerCase());
+            if (exact) {
+                this.selectAppearanceFont(exact, input);
+            } else if (this.fontHighlight >= 0 && this.matchingFonts[this.fontHighlight]) {
+                this.selectAppearanceFont(this.matchingFonts[this.fontHighlight], input);
+            } else if (this.fontHighlight === -1 && this.showDefaultFontOption) {
+                this.selectAppearanceFont('', input);
+            } else {
+                this.selectAppearanceFont(raw, input);
+            }
+        }
+    }
+
+    onFontBlur(): void {
+        if (this.fontEditing) {
+            const raw = this.fontDraft.trim();
+            if (!raw) {
+                this.applyAppearanceFont('');
+            } else {
+                const exact = this.fontFamilies.find(font => font.toLocaleLowerCase() === raw.toLocaleLowerCase());
+                if (exact) this.applyAppearanceFont(exact);
+            }
+        }
+        this.fontMenuOpen = false;
+        this.fontEditing = false;
+    }
+
+    selectAppearanceFont(font: string, input?: HTMLInputElement): void {
+        this.applyAppearanceFont(font);
+        this.fontDraft = font;
+        this.fontQuery = '';
+        this.fontEditing = false;
+        this.fontMenuOpen = false;
+        if (input) input.value = font;
+    }
+
+    private applyAppearanceFont(font: string): void {
         this.error = '';
-        try { this.appearance.setFontFamily(font); menu.hidePopover(); }
+        try { this.appearance.setFontFamily(font); }
         catch { this.error = this.i18n.text('无法保存工作台字体。', 'Unable to save workbench font.'); }
     }
 
@@ -1460,8 +1654,9 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
         catch { this.error = this.i18n.text('无法保存工作台字号。', 'Unable to save font size.'); }
     }
 
-    formatLetterSpacing(spacing: number): string {
-        return `${spacing > 0 ? '+' : ''}${spacing.toFixed(1)} px`;
+    formatLetterSpacing(spacing: number, auto = false): string {
+        const value = `${spacing > 0 ? '+' : ''}${spacing.toFixed(1)} px`;
+        return auto ? this.i18n.text(`自动 ${value}`, `Auto ${value}`) : value;
     }
 
     setAppearanceLetterSpacing(spacing: number): void {

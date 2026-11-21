@@ -10,7 +10,7 @@ import { CodexService } from './codex';
 import { CliDirectoriesPanel } from './codex-panel';
 import { WorkbenchOverlay } from './workbench-overlay';
 import { SessionPanelComponent } from './session-panel';
-import { defaultInterfaceFontSize, defaultInterfaceFontStack, defaultInterfaceLetterSpacing, paletteStyles, WorkbenchAppearance, workbenchSurfaces } from './appearance';
+import { defaultInterfaceFontSize, defaultInterfaceFontStack, paletteStyles, systemUiFontStack, WorkbenchAppearance, workbenchSurfaces } from './appearance';
 import { WorkbenchI18n } from './i18n';
 
 const workbenchIconPath = 'M1 2h14v12H1zm1.5 1.5v9h11v-9zM4 5l3 3-3 3-1-1 2-2-2-2zm4 4.5h4V11H8z';
@@ -73,9 +73,11 @@ class WorkbenchLayout implements OnDestroy {
                 --oneai-size-body:calc(var(--oneai-size) * 13 / ${defaultInterfaceFontSize});
                 --oneai-size-heading:calc(var(--oneai-size) * 16 / ${defaultInterfaceFontSize});
                 color-scheme:var(--oneai-scheme); font-family:var(--oneai-interface-font,${defaultInterfaceFontStack}); font-size:var(--oneai-size);
-                letter-spacing:var(--oneai-interface-letter-spacing,${defaultInterfaceLetterSpacing}px);
+                letter-spacing:var(--oneai-interface-letter-spacing,0px);
+                word-spacing:var(--oneai-interface-word-spacing,0px);
             }
-            app-root ${workbenchSurfaces} :is(code, .metrics, .size-pill, .version, .branch, .runtime-badge, .origin-runtime, .recent-date, .nav-badge, time) { letter-spacing:0px; }
+            app-root ${workbenchSurfaces} :is(button, input, select, textarea, dialog) { letter-spacing:inherit; word-spacing:inherit; }
+            app-root ${workbenchSurfaces} :is(code, kbd, .metrics, .size-pill, .version, .branch, .runtime-badge, .origin-runtime, .recent-date, .nav-badge, .env-tag, .cli-tag, .removed-time, .kpi-value, time) { letter-spacing:0px; word-spacing:0px; }
             app-root ${workbenchSurfaces} :is(img[alt="Codex"],img.codex-mark) { filter:var(--oneai-icon) }
             app-root tab-header img[alt="Codex"] { filter:var(--oneai-icon) }
             app-root tab-header profile-icon:not(:has(img.oneai-cli)) { display:none!important; }
@@ -111,6 +113,7 @@ class WorkbenchLayout implements OnDestroy {
         this.hostColors = document.createElement('style');
         document.head.append(this.hostColors, this.css);
         this.theme = this.appearance.changed$.subscribe(this.applyTheme);
+        void document.fonts?.ready?.then(() => this.applyTheme());
         this.zone.runOutsideAngular(() => {
             this.setupTooltips(root);
             this.observer = new MutationObserver(records => {
@@ -135,10 +138,11 @@ class WorkbenchLayout implements OnDestroy {
         if (theme === 'tabby') root.removeAttribute('data-oneai-theme');
         else root.setAttribute('data-oneai-theme', theme);
         const font = this.appearance.fontFamily.replace(/[\x00-\x1f\x7f]/g, '').replace(/["\\]/g, '\\$&');
-        if (font) root.style.setProperty('--oneai-interface-font', `"${font}", ${defaultInterfaceFontStack}`);
+        if (font) root.style.setProperty('--oneai-interface-font', `"${font}", ${systemUiFontStack}`);
         else root.style.removeProperty('--oneai-interface-font');
         root.style.setProperty('--oneai-interface-font-size', `${this.appearance.fontSize}px`);
         root.style.setProperty('--oneai-interface-letter-spacing', `${this.appearance.letterSpacing}px`);
+        root.style.setProperty('--oneai-interface-word-spacing', `${this.appearance.wordSpacing}px`);
     };
 
     private updateHostColors(): void {
@@ -257,6 +261,7 @@ class WorkbenchLayout implements OnDestroy {
         root?.style.removeProperty('--oneai-interface-font');
         root?.style.removeProperty('--oneai-interface-font-size');
         root?.style.removeProperty('--oneai-interface-letter-spacing');
+        root?.style.removeProperty('--oneai-interface-word-spacing');
         root?.style.removeProperty('--oneai-history-top');
         this.observer?.disconnect();
         this.observer = undefined;
