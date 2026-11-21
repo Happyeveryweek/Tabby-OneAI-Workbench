@@ -16,14 +16,22 @@ interface AgyMeter {
 const meterRoot = join(tmpdir(), 'tabby-oneai-meters');
 const safeId = (taskId: string) => taskId.replace(/[^a-zA-Z0-9._-]/g, '_');
 
-export function watchAgyMeterFile(resultFile: string, receive: (status: AgyStatus) => void): () => void {
+export function watchAgyMeterFile(resultFile: string, receive: (status: AgyStatus) => void, minFreshMtimeMs = 0): () => void {
     let disposed = false;
     let last = '';
     const read = () => {
-        void readFile(resultFile, 'utf8').then(text => {
+        void Promise.all([
+            readFile(resultFile, 'utf8'),
+            minFreshMtimeMs > 0 ? stat(resultFile).catch(() => null) : Promise.resolve(null),
+        ]).then(([text, info]) => {
             if (!disposed && text !== last) {
                 last = text;
-                receive(JSON.parse(text) as AgyStatus);
+                const parsed = JSON.parse(text) as AgyStatus;
+                if (minFreshMtimeMs > 0 && info && info.mtimeMs < minFreshMtimeMs
+                    && (parsed.activity === 'working' || parsed.activity === 'waiting')) {
+                    parsed.activity = 'ready';
+                }
+                receive(parsed);
             }
         }).catch(() => undefined);
     };

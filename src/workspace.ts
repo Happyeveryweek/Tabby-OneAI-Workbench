@@ -5,7 +5,7 @@ import { Subscription } from 'rxjs';
 import { cliBrand, cliIcon, supportedCli } from './cli-icons';
 import { AppService, PlatformService, ProfilesService } from './host';
 import type { App, Platform, Profiles, Tab, TerminalScreen } from './host';
-import { checkDirectory, detect, detectAvailableCli, gitBranch, localReadPath, profileFor, profilePrefix, projectLocation, resolveProjectLocation } from './commands';
+import { checkDirectory, commandFor, detect, detectAvailableCli, gitBranch, localReadPath, profileFor, profilePrefix, projectLocation, resolveProjectLocation } from './commands';
 import type { Command, Project } from './commands';
 import { CodexService, codexTerminalTitle, codexTitleOption, defaultAccount, equalPath, isCodex, withinProject } from './codex';
 import type { CodexActivity, CodexScope, HistoryEntry } from './codex';
@@ -61,6 +61,118 @@ export function statusDisplay(task: Task): StatusDisplay {
 }
 
 export function taskStatusLabel(task: Task): string { return statusLabels[statusDisplay(task)]; }
+
+export function isTrackedAiTask(task: Pick<Task, 'executable' | 'codex' | 'cliSession'>): boolean {
+    if (task.codex || task.cliSession) return true;
+    const exec = cliBrand(task.executable)?.executable;
+    return Boolean(exec && supportedCli.some(item => item.executable === exec));
+}
+
+/** Strip terminal escape sequences while keeping printable characters and line breaks. */
+export function stripTerminalEscapes(chunk: string): string {
+    return chunk
+        .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+        .replace(/\x1b[PX^_][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+        .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
+        .replace(/\x9b[0-?]*[ -/]*[@-~]/g, '')
+        .replace(/\x1b[@-Z\\-_]/g, '');
+}
+
+/** Strip terminal escape and control sequences to check for printable output. */
+export function hasVisibleTerminalText(chunk: string): boolean {
+    const plain = stripTerminalEscapes(chunk).replace(/[\x00-\x1f\x7f]/g, '');
+    return /\S/.test(plain);
+}
+
+/** Check whether an interactive CLI update prompt currently has "Update now" selected on screen. */
+export function screenHasSelectedUpdateNow(screen?: TerminalScreen): boolean {
+    if (!screen?.buffer?.active) return false;
+    const buffer = screen.buffer.active;
+    const bottom = buffer.type === 'alternate' ? screen.rows - 1 : Math.min(screen.rows - 1, buffer.cursorY + 14);
+    const lines = Array.from({ length: Math.min(20, bottom + 1) }, (_, offset) =>
+        buffer.getLine(buffer.baseY + bottom - offset)?.translateToString(true).trim() ?? '').filter(Boolean);
+    if (!lines.length) return false;
+    const hasUpdateBanner = lines.some(line =>
+        /\b(?:Update\s+available|New\s+version\s+[\w.-]+\s+is\s+available|A\s+new\s+version\s+of\b.*\bis\s+available)\b/i.test(line));
+    if (!hasUpdateBanner) return false;
+    if (lines.some(line => /^[›>❯●*]\s*(?:\d+[.)]\s*)?(?:Skip|Later|No|Cancel|Ignore|Dismiss)\b/i.test(line))) {
+        return false;
+    }
+    return lines.some(line =>
+        /^[›>❯●*]\s*(?:1[.)]\s*)?(?:Update|Upgrade|Install\s+update)(?:\s+now|\s+to\b|\s*\(|$)/i.test(line));
+}
+
+export function isCliSelfUpdateCommand(inputLine: string): boolean {
+    const trimmed = inputLine.trim();
+    return /^(?:\/(?:update|upgrade)|(?:codex|claude|agy|antigravity|opencode|pi|grok|kimi|copilot)\s+(?:update|upgrade|self-update))\s*$/i.test(trimmed);
+}
+
+export function isCliSelfUpdateOutput(text: string): boolean {
+    const plain = stripTerminalEscapes(text);
+    return /\b(?:Updating|Upgrading)\s+(?:Codex|Claude(?:\s+Code)?|Antigravity|agy|OpenCode|Pi(?:\s+Coding\s+Agent)?|Grok(?:\s+Build)?|Kimi(?:\s+Code)?|GitHub\s+Copilot|Copilot)\b/i.test(plain)
+        || /\b(?:Updating|Upgrading)\b[^\r\n]{0,80}\bvia\s+[`'"]?(?:sh|bash|curl|npm|pnpm|yarn|bun|brew|winget|pwsh|powershell|uv|pip)\b/i.test(plain)
+        || /\bhttps:\/\/chatgpt\.com\/codex\/install\.sh\b/i.test(plain)
+        || /\bCODEX_NON_INTERACTIVE=1\b/.test(plain)
+        || /\b(?:Update|Upgrade)\s+ran\s+successfully!\s*Please\s+restart\b/i.test(plain)
+        || /\bSuccessfully\s+(?:updated|upgraded)\s+(?:Codex|Claude(?:\s+Code)?|Antigravity|agy|OpenCode|Pi|Grok(?:\s+Build)?|Kimi(?:\s+Code)?|GitHub\s+Copilot|Copilot|to\s+v?\d)\b/i.test(plain)
+        || /\bPlease\s+restart\s+(?:Codex|Claude(?:\s+Code)?|Antigravity|agy|OpenCode|Pi|Grok(?:\s+Build)?|Kimi(?:\s+Code)?|GitHub\s+Copilot|Copilot)\b/i.test(plain)
+        || /\b(?:npm\s+(?:install|i|update)\s+-g|pnpm\s+add\s+-g|bun\s+add\s+-g|uv\s+tool\s+upgrade)\s+(?:@openai\/codex|@anthropic-ai\/claude-code|@mariozechner\/pi-coding-agent|opencode-ai|@github\/copilot|kimi-cli)\b/i.test(plain);
+}
+
+export function hasCliSelfUpdateFailure(text: string): boolean {
+    const plain = stripTerminalEscapes(text);
+    if (/\b(?:(?:Update|Upgrade)\s+ran\s+successfully|Successfully\s+(?:updated|upgraded|installed))\b/i.test(plain)) {
+        return false;
+    }
+    return /\b(?:Update|Upgrade|Install(?:ation)?)\s+failed\b/i.test(plain)
+        || /\bcurl:\s*\(\d+\)\s+/i.test(plain)
+        || /\bnpm\s+ERR!\b/i.test(plain)
+        || /\b(?:EACCES|EPERM|ETIMEDOUT|ECONNREFUSED|ENOTFOUND)\b/.test(plain)
+        || /\bPermission\s+denied\b/i.test(plain);
+}
+
+/** Decide whether background PTY output should mark an unfocused task as unread. */
+export function shouldMarkTaskUnreadOnOutput(
+    task: Pick<Task, 'status' | 'activity' | 'unread'> & Partial<Pick<Task, 'executable' | 'codex' | 'cliSession'>>,
+    selected: unknown,
+    output: string,
+    blurredAt?: number,
+    now = Date.now(),
+): boolean {
+    if (task.status !== 'running' || selected === task || task.unread) return false;
+    if (!hasVisibleTerminalText(output)) return false;
+    if (task.activity !== undefined || (task.executable && isTrackedAiTask({ executable: task.executable, codex: task.codex, cliSession: task.cliSession }))) {
+        return task.activity === 'working' || task.activity === 'waiting';
+    }
+    return blurredAt === undefined || now - blurredAt >= 800;
+}
+
+export function hasScreenInterrupt(screen?: TerminalScreen): boolean {
+    if (!screen?.buffer?.active) return false;
+    const buffer = screen.buffer.active;
+    const bottom = buffer.type === 'alternate' ? screen.rows - 1 : Math.min(screen.rows - 1, buffer.cursorY + 14);
+    for (let offset = 0; offset < Math.min(18, bottom + 1); offset++) {
+        const line = buffer.getLine(buffer.baseY + bottom - offset)?.translateToString(true).trim() ?? '';
+        if (!line) continue;
+        if (/(?:^|[\s│┃▌(\[•·▪■▫⬝\u2800-\u28ff])(?:esc|ctrl\+c)\s+(?:(?:again\s+)?to\s+|again\s+to\s+)?(?:interrupt|cancel|stop)(?:\s|\)|\]|$)/i.test(line)
+            || /\bsend a message to interrupt\b/i.test(line)
+            || /\b(?:Working|Thinking)\s*\([^)]*\besc\b/i.test(line)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+export function codexScreenIsIdle(screen?: TerminalScreen): boolean {
+    if (!screen?.buffer?.active || hasScreenInterrupt(screen)) return false;
+    const buffer = screen.buffer.active;
+    const bottom = buffer.type === 'alternate' ? screen.rows - 1 : Math.min(screen.rows - 1, buffer.cursorY + 12);
+    const lines = Array.from({ length: Math.min(16, bottom + 1) }, (_, offset) =>
+        buffer.getLine(buffer.baseY + bottom - offset)?.translateToString(true).trim() ?? '').filter(Boolean);
+    return lines.some(line =>
+        /^(?:[│┃▌›>❯]\s*)?Ask Codex to do anything\b/i.test(line)
+        || (/\bContext\s+\d+(?:\.\d+)?%\s+used\b/i.test(line) && /\bStarting\b/i.test(line)));
+}
 
 const terminalErrorLine = /^(?:[│┃▌⎿✖✗×!●•]\s*)*(?:Error|API\s*Error|APIError|Provider\s*Error|ProviderError|Retry\s*Error|RetryError|Authentication\s*Error|Permission\s*Error|Rate\s*limit\s*exceeded|Quota\s*exceeded|Request\s*failed|Retry\s*failed|Stream\s*disconnected|Exceeded\s*retry\s*limit|Fatal\s*error|Unhandled\s*error)\b[:：]?/i;
 
@@ -132,7 +244,7 @@ export function terminalEditorActivity(screen: TerminalScreen): CodexActivity | 
         && recentRows.some(line => /(?:Esc to cancel|Yes, allow|Deny|\[y\/n\]|\(y\/n\))/i.test(line))) {
         return 'waiting';
     }
-    if (recentRows.some(line => /(?:^|[\s│┃▌(\[•·▪■▫⬝\u2800-\u28ff])(?:esc|ctrl\+c)\s+(?:to\s+)?(?:interrupt|stop)(?:\s|\)|\]|$)/i.test(line))) {
+    if (recentRows.some(line => /(?:^|[\s│┃▌(\[•·▪■▫⬝\u2800-\u28ff])(?:esc|ctrl\+c)\s+(?:to\s+)?(?:interrupt|cancel|stop)(?:\s|\)|\]|$)/i.test(line))) {
         return 'working';
     }
     let lower = -1;
@@ -143,10 +255,10 @@ export function terminalEditorActivity(screen: TerminalScreen): CodexActivity | 
         const line = lineAt(row);
         if (lower < 0) {
             if (border.test(line)) lower = row;
-        } else if (workingBorder.test(line)) {
+        } else if (lower - row <= 12 && workingBorder.test(line)) {
             return 'working';
         } else if (border.test(line)) {
-            if (workingIndicator.test(lineAt(row - 1))) return 'working';
+            if (lower - row <= 12 && workingIndicator.test(lineAt(row - 1))) return 'working';
             return hasRecentErrorAbove(lineAt, row) ? 'error' : hasActiveFooterTasks(screen) ? 'working' : 'ready';
         }
     }
@@ -156,15 +268,21 @@ export function hasActiveFooterTasks(screen?: TerminalScreen): boolean {
     if (!screen?.buffer?.active) return false;
     const buffer = screen.buffer.active;
     const lineAt = (row: number) => buffer.getLine(buffer.baseY + row)?.translateToString(true).trim() ?? '';
+    const border = /^[╭╰┌└]?[─━═]{12,}[╮╯┐┘]?$/;
     const bottom = buffer.type === 'alternate' ? screen.rows - 1 : Math.min(screen.rows - 1, buffer.cursorY + 12);
     const footerRows: string[] = [];
+    let hasPromptOrBorderAbove = false;
     for (let row = bottom; row >= Math.max(0, bottom - 14); row--) {
         const line = lineAt(row);
         if (!line) continue;
-        if (/^[>›❯](?:\s|$)/.test(line)) break;
+        if (/^[>›❯](?:\s|$)/.test(line) || border.test(line)) {
+            hasPromptOrBorderAbove = true;
+            break;
+        }
         footerRows.push(line);
         if (footerRows.length >= 10) break;
     }
+    if (!hasPromptOrBorderAbove) return false;
     return footerRows.some(line =>
         /(?:·|\s)[1-9]\d*\s+(?:task\(s\)|background\s+tasks?|local\s+agents?)(?:\s|$|·)/i.test(line)
         || (/·\s*\/tasks\b/i.test(line) && /\b[1-9]\d*\b/.test(line))
@@ -179,12 +297,14 @@ export function grokActivity(screen: TerminalScreen): CodexActivity | undefined 
     if (lines.some(line => /(?:Allow|Approve|Reject|Deny)\b.*(?:\[y\/n\]|\(y\/n\)|enter to confirm)/i.test(line)
         || /Permission required|Waiting for approval|Waiting for answers/i.test(line))) return 'waiting';
     if (lines.some(line => /(?:^|[\s│┃▌(\[•·▪■▫⬝\u2800-\u28ff])(?:esc|ctrl\+c)\s+(?:to\s+)?(?:interrupt|cancel|stop)(?:\s|\)|\]|$)/i.test(line)
-        || /\bsend a message to interrupt\b/i.test(line)
-        || /^[\u2800-\u28ff●•·*▪■▫⬝◦]\s*(?:Thinking|Working|Running|Executing|Responding|Generating|Searching|Reading|Editing|Retrying)\b/i.test(line))) return 'working';
+        || /\bsend a message to interrupt\b/i.test(line))) return 'working';
     if (lines.some(line => /\bGrok\s+\d+(?:\.\d+)?\b.*(?:always-approve|auto|plan|default|acceptEdits)/i.test(line)
         || /\[Dashboard\]/i.test(line)
         || /\bWorked for\s+\d/i.test(line))) {
         return hasTrailingError(lines, 6) || lines.some(line => /^Turn failed\b/i.test(line)) ? 'error' : 'ready';
+    }
+    if (lines.slice(0, 6).some(line => /^[\u2800-\u28ff]\s*(?:Thinking|Working|Running|Executing|Responding|Generating|Searching|Reading|Editing|Retrying)\b/i.test(line))) {
+        return 'working';
     }
 }
 
@@ -195,10 +315,12 @@ export function copilotActivity(screen: TerminalScreen): CodexActivity | undefin
         buffer.getLine(buffer.baseY + bottom - offset)?.translateToString(true).trim() ?? '');
     if (lines.some(line => /(?:Allow|Approve|Yes,\s*and\s*allow|Permission required|for the rest of session)\b/i.test(line)
         && /(?:Once|Always|Deny|Reject|\[y\/n\]|\(y\/n\)|enter to confirm)/i.test(lines.join(' ')))) return 'waiting';
-    if (lines.some(line => /(?:^|[\s│┃▌(\[•·▪■▫⬝\u2800-\u28ff])(?:esc|ctrl\+c)\s+(?:to\s+)?(?:cancel|interrupt|stop)(?:\s|\)|\]|$)/i.test(line)
-        || /^[\u2800-\u28ff●•·*▪■▫⬝◦]\s*(?:Thinking|Working|Running|Executing|Generating|Searching|Reading|Editing|Compacting|Retrying)\b/i.test(line))) return 'working';
+    if (lines.some(line => /(?:^|[\s│┃▌(\[•·▪■▫⬝\u2800-\u28ff])(?:esc|ctrl\+c)\s+(?:to\s+)?(?:cancel|interrupt|stop)(?:\s|\)|\]|$)/i.test(line))) return 'working';
     if (lines.some(line => /Type @ to mention|shift\+tab\b.*\bmode|\?\s*for shortcuts/i.test(line))) {
         return hasTrailingError(lines, 6) ? 'error' : 'ready';
+    }
+    if (lines.slice(0, 6).some(line => /^[\u2800-\u28ff]\s*(?:Thinking|Working|Running|Executing|Generating|Searching|Reading|Editing|Compacting|Retrying)\b/i.test(line))) {
+        return 'working';
     }
     return terminalEditorActivity(screen);
 }
@@ -384,7 +506,11 @@ export class WorkspaceService implements OnDestroy {
     private closeConfirm?: (tasks: Task[]) => Promise<boolean>;
     private closePromptPromise?: Promise<boolean>;
     private bypassClosePrompt = false;
+    private startingTask?: Task;
     private readonly bindings = new Map<string, { pane: Tab; events: Subscription }>();
+    private readonly blurredAt = new Map<string, number>();
+    private readonly turnArmed = new Set<string>();
+    private readonly updatingTasks = new Map<string, { startedAt: number; output: string; restarting?: boolean }>();
     private readonly titleIds = new Map<string, string>();
     private readonly claudeTranscripts = new Map<string, string>();
     private readonly agyMeterActivities = new Map<string, CodexActivity>();
@@ -683,6 +809,7 @@ export class WorkspaceService implements OnDestroy {
         this.projectHistory.delete(project.id);
         this.allProjectHistory.delete(project.id);
         this.historyHasMore.delete(project.id);
+        if (this.selected?.projectId === project.id) this.selectTask(null);
         this.treeVersion++;
     }
 
@@ -752,6 +879,7 @@ export class WorkspaceService implements OnDestroy {
         };
         save(removedSessionsKey, record);
         this.removedSessions = load(removedSessionsKey);
+        if (task && this.selected === task) this.selectTask(null);
         this.treeVersion++;
         void this.loadRecentHistory(project);
     }
@@ -821,8 +949,8 @@ export class WorkspaceService implements OnDestroy {
         this.release(task);
         this.setTaskStatus(task, 'starting');
         task.error = undefined;
-        this.selected = task;
-        this.folded.delete(task.projectId);
+        this.startingTask = task;
+        this.selectTask(task);
         let meter: Awaited<ReturnType<typeof prepareAgyMeter>>;
         try {
             await checkDirectory(project);
@@ -864,6 +992,8 @@ export class WorkspaceService implements OnDestroy {
             meter?.dispose();
             this.setTaskStatus(task, 'failed');
             task.error = error instanceof Error ? error.message.split('\n')[0] : this.i18n.text('启动失败。', 'Failed to start.');
+        } finally {
+            if (this.startingTask === task) this.startingTask = undefined;
         }
     }
 
@@ -916,7 +1046,10 @@ export class WorkspaceService implements OnDestroy {
     }
 
     private selectTask(task: Task | null): void {
-        if (this.selected !== task) {
+        const previous = this.selected;
+        if (previous !== task) {
+            if (previous) this.blurredAt.set(previous.id, Date.now());
+            if (task) this.blurredAt.delete(task.id);
             this.selected = task;
             this.treeVersion++;
         }
@@ -936,12 +1069,27 @@ export class WorkspaceService implements OnDestroy {
         this.focusSubscription?.unsubscribe();
         const tab = this.app.activeTab;
         this.focusSubscription = tab?.focusChanged$?.subscribe(pane => this.zone.run(() => this.onPaneFocused(pane)));
-        this.zone.run(() => this.onPaneFocused(tab?.getFocusedTab?.() ?? tab));
+        const activePane = tab?.getFocusedTab?.() ?? tab?.getAllTabs?.()[0] ?? tab;
+        this.zone.run(() => this.onPaneFocused(activePane));
     }
 
     private onPaneFocused(pane: Tab | null): void {
         const binding = [...this.bindings.entries()].find(([, entry]) => entry.pane === pane);
-        this.selectTask(this.tasks.find(task => task.id === binding?.[0]) ?? null);
+        const matched = this.tasks.find(task => task.id === binding?.[0]) ?? null;
+        if (!matched && this.startingTask && pane?.profile?.id === profilePrefix + this.startingTask.id) {
+            this.selectTask(this.startingTask);
+            return;
+        }
+        this.selectTask(matched);
+    }
+
+    private resolveTaskActivity(task: Task, pane: Tab, activity?: CodexActivity): CodexActivity | undefined {
+        if (this.updatingTasks.has(task.id)) return 'working';
+        if (activity !== 'working') return activity;
+        const screen = pane.frontend?.xterm;
+        if (task.codex && codexScreenIsIdle(screen)) return 'ready';
+        if (!this.turnArmed.has(task.id) && !hasScreenInterrupt(screen)) return 'ready';
+        return 'working';
     }
 
     private attachAgyMeter(
@@ -954,14 +1102,16 @@ export class WorkspaceService implements OnDestroy {
         dispose?: () => void,
     ): void {
         const received = subscribe(({ detail, activity, sessionId, transcript }) => this.zone.run(() => {
-            if (activity) this.agyMeterActivities.set(task.id, activity);
+            const safeActivity = this.resolveTaskActivity(task, pane, activity);
+            if (safeActivity) this.agyMeterActivities.set(task.id, safeActivity);
             const tokens = !sessionId || sessionId === task.cliSession?.id ? task.detail?.tokens : undefined;
-            const hasError = activity === 'working' ? false : task.detail?.hasError;
+            const hasError = safeActivity === 'working' ? false : task.detail?.hasError;
             task.detail = { ...detail, tokens: detail.tokens ?? tokens, hasError };
             const screen = pane.frontend?.xterm;
-            const tasksRunning = activity !== 'waiting' && hasActiveFooterTasks(screen);
-            const screenErr = activity === 'ready' && screen && terminalEditorActivity(screen) === 'error';
-            const resolved = tasksRunning ? 'working' : activity === 'ready' && (hasError || screenErr) ? 'error' : activity;
+            const tasksRunning = safeActivity !== 'waiting' && hasActiveFooterTasks(screen);
+            const screenErr = safeActivity === 'ready' && screen && terminalEditorActivity(screen) === 'error';
+            const rawResolved = tasksRunning ? 'working' : safeActivity === 'ready' && (hasError || screenErr) ? 'error' : safeActivity;
+            const resolved = this.resolveTaskActivity(task, pane, rawResolved);
             this.setActivity(task, resolved);
             if (sessionId && transcript && this.claudeTranscripts.get(task.id) !== transcript) {
                 this.claudeTranscripts.set(task.id, transcript);
@@ -978,11 +1128,12 @@ export class WorkspaceService implements OnDestroy {
     private async restoreAgyMeter(task: Task, pane: Tab, events: Subscription): Promise<void> {
         const project = this.projectFor(task);
         if (!project) return;
+        const restoredAt = Date.now();
         const recovered = await recoverAgyMeter(pane.profile?.options, project).catch(() => undefined);
         const binding = this.bindings.get(task.id);
         if (!recovered || binding?.pane !== pane || events.closed) return;
         const dataDirectory = task.cliSession?.dataDirectory ?? task.dataDirectory;
-        this.attachAgyMeter(task, pane, project, dataDirectory, receive => watchAgyMeterFile(recovered.resultFile, receive), events);
+        this.attachAgyMeter(task, pane, project, dataDirectory, receive => watchAgyMeterFile(recovered.resultFile, receive, restoredAt), events);
     }
 
     private readonly observed = new WeakSet<Tab>();
@@ -1050,7 +1201,10 @@ export class WorkspaceService implements OnDestroy {
             if (!id?.startsWith(profilePrefix)) continue;
             const rawId = id.slice(profilePrefix.length);
             let task = this.tasks.find(item => item.id === rawId) ?? this.reconstructRestoredTask(rawId, tab);
-            if (!task) continue;
+            if (!task) {
+                this.observed.add(tab);
+                continue;
+            }
             const existing = this.bindings.get(task.id);
             if (existing) {
                 if (!livePanes.has(existing.pane)) {
@@ -1077,7 +1231,7 @@ export class WorkspaceService implements OnDestroy {
                 void this.updateDetails(task, true);
             }
         }
-        const focused = this.app.activeTab?.getFocusedTab?.() ?? this.app.activeTab;
+        const focused = this.app.activeTab?.getFocusedTab?.() ?? this.app.activeTab?.getAllTabs?.()[0] ?? this.app.activeTab;
         if (boundAny && (!this.selected || (focused && this.observed.has(focused)))) {
             this.watchFocus();
         }
@@ -1099,19 +1253,98 @@ export class WorkspaceService implements OnDestroy {
             return origCanClose ? origCanClose() : true;
         };
         events.add(() => { pane.canClose = origCanClose; });
+        if (pane.profile && pane.profile.behaviorOnSessionEnd !== 'close') {
+            try { pane.profile.behaviorOnSessionEnd = 'close'; } catch { /* Ignore readonly profile proxy. */ }
+        }
         pane.icon = cliIcon(task.executable);
         this.setTaskStatus(task, pane.session?.open ? 'running' : 'starting');
         let sessionEvents: Subscription | undefined;
-        const stopped = () => this.zone.run(() => this.setTaskStatus(task, task.error ? 'failed' : 'stopped'));
+        let recentUpdateProbe = '';
+        const enterSelfUpdate = (chunk = '') => {
+            let state = this.updatingTasks.get(task.id);
+            if (!state) {
+                state = { startedAt: Date.now(), output: '' };
+                this.updatingTasks.set(task.id, state);
+            }
+            if (chunk) state.output = (state.output + '\n' + stripTerminalEscapes(chunk)).slice(-4096);
+            if (pane.profile && pane.profile.behaviorOnSessionEnd !== 'keep') {
+                try { pane.profile.behaviorOnSessionEnd = 'keep'; } catch { /* Ignore readonly profile proxy. */ }
+            }
+            this.turnArmed.add(task.id);
+            if (task.activity !== 'working') {
+                this.zone.run(() => this.setActivity(task, 'working'));
+            }
+        };
+        const stopped = () => {
+            if (this.updatingTasks.get(task.id)?.restarting) return;
+            this.zone.run(() => this.setTaskStatus(task, task.error ? 'failed' : 'stopped'));
+        };
+        const onSessionClosed = () => {
+            const updateState = this.updatingTasks.get(task.id);
+            if (updateState) {
+                if (updateState.restarting) return;
+                if (hasCliSelfUpdateFailure(updateState.output)) {
+                    this.updatingTasks.delete(task.id);
+                    this.zone.run(() => {
+                        task.error = this.i18n.text('CLI 更新失败，请查看终端输出。', 'CLI update failed. Check terminal output.');
+                        this.setTaskStatus(task, 'failed');
+                    });
+                    return;
+                }
+                updateState.restarting = true;
+                this.zone.run(() => {
+                    task.error = undefined;
+                    task.activity = undefined;
+                    this.setTaskStatus(task, 'starting');
+                });
+                const restartTimer = setTimeout(() => {
+                    if (events.closed || this.bindings.get(task.id)?.pane !== pane) return;
+                    this.updatingTasks.delete(task.id);
+                    this.turnArmed.delete(task.id);
+                    recentUpdateProbe = '';
+                    if (pane.profile && pane.profile.behaviorOnSessionEnd !== 'close') {
+                        try { pane.profile.behaviorOnSessionEnd = 'close'; } catch { /* Ignore readonly profile proxy. */ }
+                    }
+                    void this.restartUpdatedSessionInPlace(task, pane, events);
+                }, 80);
+                events.add(() => clearTimeout(restartTimer));
+                return;
+            }
+            stopped();
+            if (pane.profile?.behaviorOnSessionEnd !== 'close') {
+                try { pane.destroy?.(); } catch { /* Ignore already-destroyed tab panes. */ }
+            }
+        };
         const watchSession = () => {
             sessionEvents?.unsubscribe();
             sessionEvents = new Subscription();
-            sessionEvents.add(pane.session?.closed$.subscribe(stopped));
+            sessionEvents.add(pane.session?.closed$.subscribe(onSessionClosed));
             sessionEvents.add(pane.session?.destroyed$.subscribe(stopped));
         };
         watchSession();
         events.add(pane.sessionChanged$?.subscribe(watchSession));
         events.add(() => sessionEvents?.unsubscribe());
+        let inputLine = '';
+        const watchInput = () => events.add(pane.frontend?.input$?.subscribe(data => {
+            const text = typeof data === 'string' ? data : Buffer.isBuffer(data) ? data.toString('utf8') : String(data ?? '');
+            if (/[\r\n]|\x1bOM|\x1b\[13;[0-9;]*u/.test(text)) {
+                this.turnArmed.add(task.id);
+                if (screenHasSelectedUpdateNow(pane.frontend?.xterm) || isCliSelfUpdateCommand(inputLine)) {
+                    enterSelfUpdate();
+                }
+                inputLine = '';
+                return;
+            }
+            if (text === '\x7f' || text === '\b') {
+                inputLine = inputLine.slice(0, -1);
+            } else if (text === '\x03' || text === '\x15' || text.startsWith('\x1b')) {
+                inputLine = '';
+            } else if (/^[\x20-\x7e]+$/.test(text)) {
+                inputLine = (inputLine + text).slice(-64);
+            }
+        }));
+        if (pane.frontend?.input$) watchInput();
+        else events.add(pane.frontendReady$?.subscribe(watchInput));
         let hasOscStatus = false;
         const cliExec = !task.codex ? (cliBrand(task.executable)?.executable ?? task.cliSession?.executable) : undefined;
         if (restored && (cliExec === 'agy' || cliExec === 'claude')) {
@@ -1121,9 +1354,10 @@ export class WorkspaceService implements OnDestroy {
             const watchTitle = () => events.add(pane.frontend?.title$.subscribe(title => {
                 const { id, activity } = codexTerminalTitle(title);
                 this.zone.run(() => {
-                    const nextActivity = activity === 'ready' && !hasScreenAbort(pane.frontend?.xterm)
+                    const safeActivity = this.resolveTaskActivity(task, pane, activity);
+                    const nextActivity = safeActivity === 'ready' && !hasScreenAbort(pane.frontend?.xterm)
                         && (task.error || task.detail?.hasError || codexScreenHasError(pane.frontend?.xterm))
-                        ? 'error' : activity;
+                        ? 'error' : safeActivity;
                     this.setActivity(task, nextActivity);
                     if (!id || id === this.titleIds.get(task.id)) return;
                     this.titleIds.set(task.id, id);
@@ -1135,13 +1369,49 @@ export class WorkspaceService implements OnDestroy {
                     void this.updateDetails(task, true);
                 });
             }));
+            const watchCodexScreen = () => {
+                const screen = pane.frontend?.xterm;
+                if (!screen?.onWriteParsed) return;
+                let throttleTimer: ReturnType<typeof setTimeout> | undefined;
+                let lastRun = 0;
+                const runCheck = () => {
+                    throttleTimer = undefined;
+                    lastRun = Date.now();
+                    if (this.updatingTasks.has(task.id)) return;
+                    if (task.activity === 'working' && codexScreenIsIdle(screen)) {
+                        const next = !hasScreenAbort(screen) && (task.error || task.detail?.hasError || codexScreenHasError(screen)) ? 'error' : 'ready';
+                        this.zone.run(() => this.setActivity(task, next));
+                    } else if (task.activity !== 'working' && hasScreenInterrupt(screen)) {
+                        this.turnArmed.add(task.id);
+                        this.zone.run(() => this.setActivity(task, 'working'));
+                    }
+                };
+                this.zone.runOutsideAngular(() => {
+                    const listener = screen.onWriteParsed(() => {
+                        const elapsed = Date.now() - lastRun;
+                        if (elapsed >= 100) {
+                            if (throttleTimer) { clearTimeout(throttleTimer); throttleTimer = undefined; }
+                            runCheck();
+                        } else if (!throttleTimer) {
+                            throttleTimer = setTimeout(runCheck, 100 - elapsed);
+                        }
+                    });
+                    events.add(() => {
+                        if (throttleTimer) clearTimeout(throttleTimer);
+                        listener.dispose();
+                    });
+                    runCheck();
+                });
+            };
             if (pane.frontend?.title$) watchTitle();
             else events.add(pane.frontendReady$?.subscribe(watchTitle));
+            if (pane.frontend?.xterm) watchCodexScreen();
+            else events.add(pane.frontendReady$?.subscribe(watchCodexScreen));
         } else {
             const executable = cliExec;
             if (executable === 'grok') {
                 const watchGrokTitle = () => events.add(pane.frontend?.title$.subscribe(title => {
-                    const titleActivity = grokTerminalTitle(title);
+                    const titleActivity = this.resolveTaskActivity(task, pane, grokTerminalTitle(title));
                     if (titleActivity && titleActivity !== task.activity) {
                         this.zone.run(() => this.setActivity(task, titleActivity));
                     }
@@ -1162,11 +1432,12 @@ export class WorkspaceService implements OnDestroy {
                     const runUpdate = () => {
                         throttleTimer = undefined;
                         lastRun = Date.now();
-                        const activity = readActivity(screen);
+                        if (hasScreenInterrupt(screen)) this.turnArmed.add(task.id);
+                        const activity = this.resolveTaskActivity(task, pane, readActivity(screen));
                         if (executable === 'agy' && task.detail?.quota) {
                             const meterActivity = this.agyMeterActivities.get(task.id);
                             const tasksRunning = meterActivity !== 'waiting' && hasActiveFooterTasks(screen);
-                            const resolved = tasksRunning ? 'working' : activity === 'error' ? 'error' : meterActivity;
+                            const resolved = this.resolveTaskActivity(task, pane, tasksRunning ? 'working' : activity === 'error' ? 'error' : meterActivity);
                             if (resolved && resolved !== task.activity) this.zone.run(() => this.setActivity(task, resolved));
                             return;
                         }
@@ -1215,13 +1486,32 @@ export class WorkspaceService implements OnDestroy {
             }
         }
         events.add(pane.destroyed$.subscribe(() => {
-            stopped();
+            const wasSelected = this.selected === task;
             this.release(task);
+            stopped();
+            if (wasSelected) this.watchFocus();
         }));
         let startupOutput = '';
         let oscRemainder = '';
         let oscProgressRemainder = '';
         events.add(pane.output$?.subscribe(output => {
+            const plainChunk = stripTerminalEscapes(output);
+            recentUpdateProbe = (recentUpdateProbe + plainChunk).slice(-1024);
+            const activeUpdate = this.updatingTasks.get(task.id);
+            if (activeUpdate) {
+                activeUpdate.output = (activeUpdate.output + plainChunk).slice(-4096);
+                if (Date.now() - activeUpdate.startedAt > 1500
+                    && /\b(?:already\s+up\s+to\s+date|no\s+updates?\s+available|is\s+up\s+to\s+date)\b/i.test(activeUpdate.output)) {
+                    this.updatingTasks.delete(task.id);
+                    if (pane.profile && pane.profile.behaviorOnSessionEnd !== 'close') {
+                        try { pane.profile.behaviorOnSessionEnd = 'close'; } catch { /* Ignore readonly profile proxy. */ }
+                    }
+                } else if (task.activity !== 'working') {
+                    this.zone.run(() => this.setActivity(task, 'working'));
+                }
+            } else if (isCliSelfUpdateOutput(plainChunk) || isCliSelfUpdateOutput(recentUpdateProbe)) {
+                enterSelfUpdate(plainChunk);
+            }
             if (output.includes('7501;') || oscRemainder) {
                 const combined = oscRemainder + output;
                 let oscActivity = parseProgramStatusOsc(combined);
@@ -1230,6 +1520,7 @@ export class WorkspaceService implements OnDestroy {
                     && (task.detail?.hasError || (pane.frontend?.xterm && terminalEditorActivity(pane.frontend.xterm) === 'error'))) {
                     oscActivity = 'error';
                 }
+                oscActivity = this.resolveTaskActivity(task, pane, oscActivity);
                 if (oscActivity && oscActivity !== task.activity) {
                     this.zone.run(() => this.setActivity(task, oscActivity));
                 }
@@ -1244,13 +1535,14 @@ export class WorkspaceService implements OnDestroy {
                     && (task.detail?.hasError || (pane.frontend?.xterm && grokActivity(pane.frontend.xterm) === 'error'))) {
                     progressActivity = 'error';
                 }
+                progressActivity = this.resolveTaskActivity(task, pane, progressActivity);
                 if (progressActivity && progressActivity !== task.activity) {
                     this.zone.run(() => this.setActivity(task, progressActivity));
                 }
                 const lastEsc = combined.lastIndexOf('\x1b]9;4;');
                 oscProgressRemainder = lastEsc >= 0 && combined.length - lastEsc < 64 ? combined.slice(lastEsc) : '';
             }
-            if (task.codex?.sessionId && !task.activity && !task.error) {
+            if (task.codex?.sessionId && !this.turnArmed.has(task.id) && !task.error) {
                 startupOutput = (startupOutput + output).slice(-2048);
                 const provider = startupOutput.match(/account\/gatewayOAuth\/read failed:[\s\S]*?model provider\s+["“]([\w.-]+)["”][\s\S]*?no longer configured/i)?.[1];
                 if (provider) this.zone.run(() => {
@@ -1261,13 +1553,24 @@ export class WorkspaceService implements OnDestroy {
             if (task.status === 'starting' && pane.session?.open) {
                 this.zone.run(() => this.setTaskStatus(task, 'running'));
             }
-            if (/\S/.test(output) && task.status === 'running') {
-                if (!task.unread && this.selected !== task) {
-                    this.zone.run(() => { task.unread = true; });
+            if (task.status === 'running' && hasVisibleTerminalText(output)) {
+                if (shouldMarkTaskUnreadOnOutput(task, this.selected, output, this.blurredAt.get(task.id))) {
+                    this.zone.run(() => {
+                        task.unread = true;
+                        this.treeVersion++;
+                    });
                 }
                 if (this.isDefaultTaskName(task)) void this.updateDetails(task);
             }
         }));
+        this.waitForSessionOpen(task, pane, events);
+    }
+
+    private waitForSessionOpen(task: Task, pane: Tab, events: Subscription): void {
+        if (pane.session?.open && task.status === 'starting') {
+            this.zone.run(() => this.setTaskStatus(task, 'running'));
+            return;
+        }
         this.zone.runOutsideAngular(() => {
             const deadline = Date.now() + 15000;
             const timer = setInterval(() => {
@@ -1287,9 +1590,60 @@ export class WorkspaceService implements OnDestroy {
         });
     }
 
+    private async restartUpdatedSessionInPlace(task: Task, pane: Tab, events: Subscription): Promise<void> {
+        const parent = this.projectFor(task);
+        if (parent && pane.profile?.options) {
+            const project = task.directory ? { ...parent, directory: task.directory } : parent;
+            try {
+                const cli = configurableCli(task.executable);
+                const brandExec = cliBrand(task.executable)?.executable;
+                const dataDirectory = task.cliSession?.dataDirectory ?? task.dataDirectory;
+                const baseEnv = cli && dataDirectory ? { [directoryVariables[cli]]: dataDirectory,
+                    ...(cli === 'kimi' ? { KIMI_SHARE_DIR: dataDirectory } : {}) } : undefined;
+                const env = brandExec === 'pi' ? { ...baseEnv, PI_PROGRAM_STATUS: '1' } : baseEnv;
+                let command: Command = env ? { ...task, env } : task;
+                if (task.codex) {
+                    const scope = await this.codex.scope(project.distro, task.codex.accountId);
+                    command = {
+                        executable: task.executable, codexHome: scope.directory,
+                        args: ['-c', codexTitleOption, ...(task.codex.sessionId ? ['resume', task.codex.sessionId] : [])],
+                    };
+                } else if (task.cliSession?.args?.length && !command.args.length) {
+                    command = { ...command, args: [...task.cliSession.args] };
+                }
+                if (!events.closed && this.bindings.get(task.id)?.pane === pane && !(brandExec === 'agy' || cli === 'claude')) {
+                    try { pane.profile.options = commandFor(project, command); } catch { /* Keep existing profile options. */ }
+                }
+            } catch { /* Keep existing profile options when scope lookup fails. */ }
+        }
+        if (events.closed || this.bindings.get(task.id)?.pane !== pane) return;
+        const hostPane = pane as Tab & {
+            size?: { columns?: number; rows?: number };
+            initializeSession?: (columns: number, rows: number) => void;
+            frontend?: { resetTerminalModes?: () => void; xterm?: TerminalScreen & { cols?: number } };
+        };
+        if (typeof hostPane.initializeSession === 'function') {
+            const cols = hostPane.size?.columns ?? hostPane.frontend?.xterm?.cols ?? 80;
+            const rows = hostPane.size?.rows ?? hostPane.frontend?.xterm?.rows ?? 30;
+            try { hostPane.frontend?.resetTerminalModes?.(); } catch {}
+            hostPane.initializeSession(cols, rows);
+            this.waitForSessionOpen(task, pane, events);
+            return;
+        }
+        this.release(task);
+        this.setTaskStatus(task, 'stopped');
+        try { pane.destroy?.(); } catch {}
+        await this.start(task);
+    }
+
     private setTaskStatus(task: Task, status: TaskStatus): void {
         task.status = status;
-        if (status === 'stopped' || status === 'failed') task.activity = undefined;
+        if (status === 'stopped' || status === 'failed') {
+            task.activity = undefined;
+            task.unread = false;
+        } else if (status === 'running' && !task.activity && isTrackedAiTask(task)) {
+            task.activity = 'ready';
+        }
         const pane = this.bindings.get(task.id)?.pane;
         if (pane) pane.color = statusColors[statusDisplay(task)];
         this.treeVersion++;
@@ -1300,6 +1654,12 @@ export class WorkspaceService implements OnDestroy {
         const previous = task.activity;
         task.activity = activity;
         if (activity === 'working' && task.detail?.hasError) task.detail.hasError = false;
+        if (this.selected !== task && !task.unread && (
+            activity === 'waiting'
+            || ((previous === 'working' || previous === 'waiting') && (activity === 'ready' || activity === 'error'))
+        )) {
+            task.unread = true;
+        }
         this.setTaskStatus(task, task.status);
         if (previous === 'working' || activity === 'working' || activity === 'ready' || activity === 'error') {
             task.lastActiveAt = Date.now();
@@ -1375,6 +1735,9 @@ export class WorkspaceService implements OnDestroy {
     private release(task: Task): void {
         this.bindings.get(task.id)?.events.unsubscribe();
         this.bindings.delete(task.id);
+        this.blurredAt.delete(task.id);
+        this.turnArmed.delete(task.id);
+        this.updatingTasks.delete(task.id);
         this.titleIds.delete(task.id);
         this.claudeTranscripts.delete(task.id);
         this.agyMeterActivities.delete(task.id);

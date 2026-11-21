@@ -85,23 +85,19 @@ class WorkbenchLayout implements OnDestroy {
             app-root tab-header profile-icon:has(img.oneai-cli) { order:-1; display:inline-flex; align-items:center; align-self:center; flex:none; font-size:inherit; line-height:inherit; margin:1px 4px 0 0; }
             app-root tab-header profile-icon .icon:has(img.oneai-cli) { display:inline-flex; align-items:center; width:1.08em; height:1.08em; vertical-align:middle; line-height:inherit; margin:0; }
             app-root tab-header img.oneai-cli { display:inline-block; width:1.08em; height:1.08em; vertical-align:middle; }
-            @keyframes oneai-tab-sweep { 0% { background-position:200% 0 } 100% { background-position:-200% 0 } }
-            @keyframes oneai-tab-pulse-green {
-                0%, 100% { box-shadow:0 0 6px rgba(32, 183, 130, 0.45); }
-                50% { box-shadow:0 -1px 12px rgba(110, 231, 183, 0.85); }
+            @keyframes oneai-tab-breath-green {
+                0%, 100% { opacity:.48; box-shadow:0 0 2px rgba(32, 183, 130, 0.15); }
+                50% { opacity:1; box-shadow:0 0 7px rgba(32, 183, 130, 0.48); }
             }
-            @keyframes oneai-tab-pulse-amber {
-                0%, 100% { opacity:.75; box-shadow:0 0 4px rgba(207, 146, 12, 0.35); }
-                50% { opacity:1; box-shadow:0 -1px 10px rgba(251, 191, 36, 0.78); }
+            @keyframes oneai-tab-breath-amber {
+                0%, 100% { opacity:.45; box-shadow:0 0 2px rgba(207, 146, 12, 0.15); }
+                50% { opacity:1; box-shadow:0 0 7px rgba(217, 155, 24, 0.45); }
             }
-            app-root tab-header:has(img.oneai-cli):has(> .colorbar) > .current-tab-indicator { display:none!important; }
             app-root tab-header:has(img.oneai-cli) > .colorbar:is([style*="32, 183, 130" i], [style*="#20b782" i]) {
-                background:linear-gradient(90deg,#12805a,#20b782,#6ee7b7,#d1fae5,#6ee7b7,#20b782,#12805a)!important;
-                background-size:200% 100%; animation:oneai-tab-sweep 1.35s linear infinite, oneai-tab-pulse-green 1.35s ease-in-out infinite;
+                background:#20b782!important; animation:oneai-tab-breath-green 2.2s ease-in-out infinite;
             }
             app-root tab-header:has(img.oneai-cli) > .colorbar:is([style*="207, 146, 12" i], [style*="#cf920c" i]) {
-                background:linear-gradient(90deg,#b47908,#cf920c,#fbbf24,#cf920c,#b47908)!important;
-                background-size:200% 100%; animation:oneai-tab-sweep 2.2s linear infinite, oneai-tab-pulse-amber 1.6s ease-in-out infinite;
+                background:#d99b18!important; animation:oneai-tab-breath-amber 2.4s ease-in-out infinite;
             }
             app-root .oneai-tooltip { position:fixed; inset:auto; margin:0; padding:6px 10px; max-width:min(360px,calc(100vw - 24px));
                 border-radius:9px; border:1px solid var(--palette-line-strong,var(--palette-line,color-mix(in srgb,currentColor 20%,transparent)));

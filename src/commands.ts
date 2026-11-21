@@ -203,7 +203,7 @@ export function profileFor(id: string, title: string, project: Project, command:
     return {
         id: profilePrefix + id, type: 'local', name: title,
         icon: cliIcon(command.executable), color,
-        disableDynamicTitle: true, behaviorOnSessionEnd: 'keep', options: commandFor(project, command),
+        disableDynamicTitle: true, behaviorOnSessionEnd: 'close', options: commandFor(project, command),
     };
 }
 

@@ -8,7 +8,7 @@ export interface LocalProfile {
     icon?: string;
     color?: string;
     disableDynamicTitle: boolean;
-    behaviorOnSessionEnd: 'keep';
+    behaviorOnSessionEnd: 'auto' | 'keep' | 'close';
     options: { command: string; args: string[]; cwd?: string; env?: Record<string, string> };
 }
 
@@ -21,13 +21,14 @@ export interface Tab {
     readonly session?: Session | null;
     readonly sessionChanged$?: Observable<Session | null>;
     readonly output$?: Observable<string>;
-    readonly frontend?: { readonly title$: Observable<string>; readonly xterm?: TerminalScreen };
+    readonly frontend?: { readonly title$: Observable<string>; readonly input$?: Observable<Buffer | string>; readonly xterm?: TerminalScreen };
     readonly frontendReady$?: Observable<void>;
     readonly initialized$?: Observable<void>;
     getAllTabs?(): Tab[];
     getFocusedTab?(): Tab | null;
     focus?(tab: Tab): void;
     canClose?(): Promise<boolean>;
+    destroy?(skipDestroyedEvent?: boolean): void;
     readonly focusChanged$?: Observable<Tab>;
 }
 

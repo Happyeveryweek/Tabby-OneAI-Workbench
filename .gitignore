@@ -1,5 +1,6 @@
 node_modules/
 dist/
+artifacts/
 *.tgz
 .env*
 *.log
@@ -9,3 +10,10 @@ dist/
 .claude/
 .DS_Store
 Thumbs.db
+
+# 本地内部设计、验收与路线图文档（保留在本地，不随开源仓库发布）
+/AGENTS.md
+/DESIGN.md
+/IMPLEMENTATION.md
+/ROADMAP.md
+/docs/
