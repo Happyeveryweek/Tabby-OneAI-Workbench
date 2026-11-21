@@ -141,11 +141,24 @@ flowchart LR
 
 No Node.js build required -- download the ready-to-use plugin archive directly:
 
-#### 1. Manual Unzip (3 Steps)
+#### 1. Manual Unzip (Step-by-Step)
 
 1. Go to [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest) and download **`tabby-oneai-v0.2.13.zip`**;
-2. Press `Win + R`, enter `%APPDATA%\tabby\plugins\node_modules`, and press Enter (create the folder if it does not exist);
-3. Extract the `tabby-oneai` folder from the zip into that directory (so `%APPDATA%\tabby\plugins\node_modules\tabby-oneai\package.json` exists), then restart Tabby. The **AI Workbench (`v0.2.13`)** sidebar will appear on the left.
+2. Press `Win + R`, enter **`%APPDATA%\tabby`**, and press Enter to open Tabby's configuration directory, then navigate into `plugins` → `node_modules`:
+   - **If the `plugins` or `node_modules` folder does not exist yet** (common on a fresh Tabby install), manually create the `plugins` folder inside `%APPDATA%\tabby`, and then create a `node_modules` folder inside `plugins`;
+3. **The zip archive already contains the top-level `tabby-oneai` folder**. Place that `tabby-oneai` folder directly inside `node_modules` (**keep the `tabby-oneai` directory level, and make sure not to nest an extra folder like `tabby-oneai-v0.2.13\tabby-oneai` or `tabby-oneai\tabby-oneai`**). Your final directory tree should look exactly like this:
+
+```text
+%APPDATA%\tabby\plugins\node_modules\
+└── tabby-oneai\                <-- Keep this tabby-oneai folder inside node_modules
+    ├── package.json
+    ├── THIRD_PARTY_NOTICES.md
+    └── dist\
+        ├── index.js
+        └── ...
+```
+
+4. Restart Tabby. The **AI Workbench (`v0.2.13`)** sidebar will appear on the left.
 
 #### 2. Or One-Line PowerShell Install
 
@@ -202,6 +215,13 @@ All hotkeys can be recorded, cleared, or reset to defaults in **Workbench Settin
 - **100% Local Read-Only Parsing**: All session histories, prompt drawers, and token usage statistics are parsed locally from your Windows or WSL CLI data directories. No code, prompts, or telemetry are ever sent to any external server.
 - **Zero Credential Harvesting**: API keys, OAuth tokens, and login states are managed exclusively by each AI CLI. The plugin never writes secrets, credentials, or terminal scrollback contents into project files or logs.
 - **Scoped Persistence**: Project lists, task bindings, appearance settings, and custom CLI directory mappings are stored locally inside the active Tabby profile's `localStorage`.
+
+---
+
+## Feedback & Contact
+
+- **Bug Reports & Feature Requests**: [GitHub Issues](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/issues)
+- **Author Email**: [w6626176@gmail.com](mailto:w6626176@gmail.com)
 
 ---
 

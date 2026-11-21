@@ -144,8 +144,21 @@ flowchart LR
 #### 1. 图形界面解压安装（3 步完成）
 
 1. 前往 [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest) 下载最新版本的 **`tabby-oneai-v0.2.13.zip`**；
-2. 按 `Win + R` 打开「运行」，输入 `%APPDATA%\tabby\plugins\node_modules` 并回车（若目录不存在请手动创建）；
-3. 将压缩包内的 `tabby-oneai` 文件夹解压到该目录下（确保最终包含 `%APPDATA%\tabby\plugins\node_modules\tabby-oneai\package.json`），重启 Tabby 即可在左侧看到 **AI 工作台 (`v0.2.13`)**。
+2. 按 `Win + R` 打开「运行」，输入 **`%APPDATA%\tabby`** 并回车打开 Tabby 配置根目录，依次进入 `plugins` → `node_modules` 目录：
+   - **如果目录中还没有 `plugins` 或 `node_modules` 文件夹**（首次安装 Tabby 插件时常见），请先在 `%APPDATA%\tabby` 下手动新建 `plugins` 文件夹，再在 `plugins` 内新建 `node_modules` 文件夹；
+3. **压缩包内已自带一层 `tabby-oneai` 文件夹**，请将压缩包里的 `tabby-oneai` 文件夹直接放入 `node_modules` 目录下（**注意：必须保留 `tabby-oneai` 这一层目录，但不要多套一层 `tabby-oneai-v0.2.13\tabby-oneai` 或 `tabby-oneai\tabby-oneai`**），解压后的最终目录结构应如下：
+
+```text
+%APPDATA%\tabby\plugins\node_modules\
+└── tabby-oneai\                <-- 必须带这一层 tabby-oneai 文件夹
+    ├── package.json
+    ├── THIRD_PARTY_NOTICES.md
+    └── dist\
+        ├── index.js
+        └── ...
+```
+
+4. 重启 Tabby，即可在窗口左侧看到 **AI 工作台 (`v0.2.13`)** 常驻侧栏。
 
 #### 2. 或使用 PowerShell 一键下载安装
 
@@ -202,6 +215,13 @@ Copy-Item -Path dist\* -Destination "$target\dist" -Recurse -Force
 - **100% 本地只读解析**：所有会话历史、提示词与 Token 统计均直接从本机或 WSL 对应 CLI 的本地日志目录只读解析，插件不设立任何外部服务器，不上传任何代码、提示词或统计数据。
 - **凭据零触碰**：各 AI CLI 的 API Key、OAuth Token 与登录态完全由对应 CLI 自身管理；插件不会将密钥、凭据或终端正文写入项目文件或插件日志。
 - **环境隔离**：项目、任务绑定关系、外观配置与自定义 CLI 数据目录仅保存在当前 Tabby 实例的本地存储（`localStorage`）中。
+
+---
+
+## 反馈与联系
+
+- **问题反馈 / 功能建议**：欢迎提交 [GitHub Issues](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/issues)
+- **作者联系邮箱**：[w6626176@gmail.com](mailto:w6626176@gmail.com)
 
 ---
 
