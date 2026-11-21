@@ -10,7 +10,7 @@ import { CodexService } from './codex';
 import { CliDirectoriesPanel } from './codex-panel';
 import { WorkbenchOverlay } from './workbench-overlay';
 import { SessionPanelComponent } from './session-panel';
-import { defaultInterfaceFontSize, defaultInterfaceFontStack, paletteStyles, WorkbenchAppearance, workbenchSurfaces } from './appearance';
+import { defaultInterfaceFontSize, defaultInterfaceFontStack, defaultInterfaceLetterSpacing, paletteStyles, WorkbenchAppearance, workbenchSurfaces } from './appearance';
 import { WorkbenchI18n } from './i18n';
 
 const workbenchIconPath = 'M1 2h14v12H1zm1.5 1.5v9h11v-9zM4 5l3 3-3 3-1-1 2-2-2-2zm4 4.5h4V11H8z';
@@ -73,7 +73,9 @@ class WorkbenchLayout implements OnDestroy {
                 --oneai-size-body:calc(var(--oneai-size) * 13 / ${defaultInterfaceFontSize});
                 --oneai-size-heading:calc(var(--oneai-size) * 16 / ${defaultInterfaceFontSize});
                 color-scheme:var(--oneai-scheme); font-family:var(--oneai-interface-font,${defaultInterfaceFontStack}); font-size:var(--oneai-size);
+                letter-spacing:var(--oneai-interface-letter-spacing,${defaultInterfaceLetterSpacing}px);
             }
+            app-root ${workbenchSurfaces} :is(code, .metrics, .size-pill, .version, .branch, .runtime-badge, .origin-runtime, .recent-date, .nav-badge, time) { letter-spacing:0px; }
             app-root ${workbenchSurfaces} :is(img[alt="Codex"],img.codex-mark) { filter:var(--oneai-icon) }
             app-root tab-header img[alt="Codex"] { filter:var(--oneai-icon) }
             app-root tab-header profile-icon:not(:has(img.oneai-cli)) { display:none!important; }
@@ -136,6 +138,7 @@ class WorkbenchLayout implements OnDestroy {
         if (font) root.style.setProperty('--oneai-interface-font', `"${font}", ${defaultInterfaceFontStack}`);
         else root.style.removeProperty('--oneai-interface-font');
         root.style.setProperty('--oneai-interface-font-size', `${this.appearance.fontSize}px`);
+        root.style.setProperty('--oneai-interface-letter-spacing', `${this.appearance.letterSpacing}px`);
     };
 
     private updateHostColors(): void {
@@ -253,6 +256,7 @@ class WorkbenchLayout implements OnDestroy {
         root?.removeAttribute('data-oneai-theme');
         root?.style.removeProperty('--oneai-interface-font');
         root?.style.removeProperty('--oneai-interface-font-size');
+        root?.style.removeProperty('--oneai-interface-letter-spacing');
         root?.style.removeProperty('--oneai-history-top');
         this.observer?.disconnect();
         this.observer = undefined;

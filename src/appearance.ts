@@ -71,9 +71,12 @@ export const workbenchSurfaces = ':is(oneai-projects, oneai-status, oneai-overla
 const themeKey = 'tabby-oneai.appearance.theme.v1';
 const fontKey = 'tabby-oneai.appearance.font.v1';
 const fontSizeKey = 'tabby-oneai.appearance.font-size.v1';
+const letterSpacingKey = 'tabby-oneai.appearance.letter-spacing.v1';
 export const defaultInterfaceFontSize = 13;
 export const interfaceFontSizeRange = { min: 11, max: 24 };
-export const defaultInterfaceFontStack = '"Segoe UI Variable", "Segoe UI", "HarmonyOS Sans SC", "Sarasa UI SC", "MiSans", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif';
+export const defaultInterfaceLetterSpacing = -0.4;
+export const interfaceLetterSpacingRange = { min: -1.2, max: 1.2, step: 0.1 };
+export const defaultInterfaceFontStack = '"Maple Mono NF CN", "Maple Mono NF CN Medium", "Segoe UI Variable", "Segoe UI", "HarmonyOS Sans SC", "Sarasa UI SC", "MiSans", "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", system-ui, -apple-system, sans-serif';
 
 export const paletteStyles = palettes.map(({ id, mode, colors }) => `
     app-root[data-oneai-theme="${id}"] ${workbenchSurfaces} {
@@ -92,6 +95,11 @@ function customFontSize(size: number): number {
     return Math.max(min, Math.min(max, Math.round(size)));
 }
 
+function customLetterSpacing(spacing: number): number {
+    const { min, max } = interfaceLetterSpacingRange;
+    return Math.round(Math.max(min, Math.min(max, spacing)) * 10) / 10;
+}
+
 @Injectable()
 export class WorkbenchAppearance {
     private readonly changed = new BehaviorSubject<void>(undefined);
@@ -99,6 +107,7 @@ export class WorkbenchAppearance {
     theme: AppearanceTheme = this.initialTheme();
     fontFamily = storedValue(fontKey);
     fontSize = this.initialFontSize();
+    letterSpacing = this.initialLetterSpacing();
 
     constructor(@Inject(ConfigService) private readonly config: HostConfig) {}
 
@@ -113,6 +122,20 @@ export class WorkbenchAppearance {
     resetFontSize(): void {
         localStorage.setItem(fontSizeKey, String(defaultInterfaceFontSize));
         this.fontSize = defaultInterfaceFontSize;
+        this.changed.next();
+    }
+
+    setLetterSpacing(spacing: number): void {
+        if (!Number.isFinite(spacing)) return;
+        const clamped = customLetterSpacing(spacing);
+        localStorage.setItem(letterSpacingKey, String(clamped));
+        this.letterSpacing = clamped;
+        this.changed.next();
+    }
+
+    resetLetterSpacing(): void {
+        localStorage.setItem(letterSpacingKey, String(defaultInterfaceLetterSpacing));
+        this.letterSpacing = defaultInterfaceLetterSpacing;
         this.changed.next();
     }
 
@@ -145,5 +168,12 @@ export class WorkbenchAppearance {
             }
         } catch { /* Fall back to the independent default font size. */ }
         return defaultInterfaceFontSize;
+    }
+
+    private initialLetterSpacing(): number {
+        const raw = storedValue(letterSpacingKey);
+        if (!raw) return defaultInterfaceLetterSpacing;
+        const numeric = Number(raw);
+        return Number.isFinite(numeric) ? customLetterSpacing(numeric) : defaultInterfaceLetterSpacing;
     }
 }

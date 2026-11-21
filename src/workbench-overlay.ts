@@ -12,7 +12,7 @@ import type { WorkbenchLanguage } from './i18n';
 import { statusDisplay, taskStatusLabel, WorkspaceService } from './workspace';
 import type { RemovedSession, Task } from './workspace';
 import type { HistoryEntry } from './codex';
-import { defaultInterfaceFontSize, interfaceFontSizeRange, palettes, WorkbenchAppearance } from './appearance';
+import { defaultInterfaceFontSize, defaultInterfaceLetterSpacing, interfaceFontSizeRange, interfaceLetterSpacingRange, palettes, WorkbenchAppearance } from './appearance';
 import type { AppearanceTheme } from './appearance';
 
 interface SearchSessionItem {
@@ -121,10 +121,11 @@ interface RemovedProjectGroup {
         .setting-card { border:1px solid var(--line); border-radius:9px; padding:14px 15px;
             background:var(--palette-elevated,color-mix(in srgb,currentColor 4%,transparent)); display:flex; flex-direction:column; gap:12px; }
         .card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-        .card-head strong { font-size:var(--oneai-size-body); }
+        .card-head strong { font-size:var(--oneai-size-body); white-space:nowrap; flex:none; }
         .card-head small { font-size:var(--oneai-size-caption); color:var(--palette-fg-subtle,color-mix(in srgb,currentColor 70%,transparent)); }
 
-        .typography-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:14px; align-items:start; }
+        .typography-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+        .appearance-letter-spacing { grid-column:1 / -1; }
         .segmented { display:inline-flex; padding:3px; border-radius:9px;
             background:var(--palette-panel,color-mix(in srgb,currentColor 5%,transparent)); border:1px solid var(--line); gap:2px; }
         .segmented button { padding:4px 10px; border-radius:6px; border:1px solid transparent; background:transparent;
@@ -467,12 +468,12 @@ interface RemovedProjectGroup {
                                 <div class="appearance-font">
                                     <div class="card-head" style="margin-bottom:8px">
                                         <strong id="oneai-font-label">{{ i18n.text('工作台字体', 'Font Family') }}</strong>
-                                        <small>{{ i18n.text('支持搜索本机字体 · 自动兜底', 'Search installed fonts · auto fallback') }}</small>
+                                        <small>{{ i18n.text('支持搜索 · 自动兜底', 'Search · auto fallback') }}</small>
                                     </div>
                                     <button #fontTrigger type="button" class="font-trigger" aria-labelledby="oneai-font-label oneai-font-choice"
                                         [attr.aria-expanded]="fontMenuOpen" aria-controls="oneai-font-menu"
                                         (click)="openFontMenu(fontTrigger, fontMenu, fontSearch)">
-                                        <span id="oneai-font-choice">{{ appearance.fontFamily || i18n.text('系统默认 UI（自适应回退）', 'System Default UI (Auto Fallback)') }}</span>
+                                        <span id="oneai-font-choice">{{ appearance.fontFamily || i18n.text('默认（Maple Mono NF CN 优先）', 'Default (Maple Mono NF CN · Auto Fallback)') }}</span>
                                         <i class="fas fa-angle-down" aria-hidden="true"></i>
                                     </button>
                                     <div #fontMenu id="oneai-font-menu" class="font-menu" popover="auto" role="group" [attr.aria-label]="i18n.text('选择工作台字体', 'Choose workbench font')"
@@ -483,12 +484,30 @@ interface RemovedProjectGroup {
                                             (keydown.enter)="selectMatchingFont($event, fontMenu)">
                                         <div class="font-options">
                                             <button *ngIf="!fontQuery.trim()" type="button" class="font-option" [attr.aria-pressed]="!appearance.fontFamily"
-                                                (click)="setAppearanceFont('', fontMenu)">{{ i18n.text('系统默认 UI（自适应回退）', 'System Default UI (Auto Fallback)') }}</button>
+                                                (click)="setAppearanceFont('', fontMenu)">{{ i18n.text('默认（Maple Mono NF CN 优先）', 'Default (Maple Mono NF CN · Auto Fallback)') }}</button>
                                             <button *ngFor="let font of matchingFonts; trackBy: trackByValue" type="button" class="font-option" [attr.aria-pressed]="font === appearance.fontFamily"
                                                 (click)="setAppearanceFont(font, fontMenu)">{{ font }}</button>
                                             <p *ngIf="fontQuery.trim() && !matchingFonts.length" class="muted font-empty" role="status">{{ i18n.text('没有匹配的字体', 'No matching fonts') }}</p>
                                         </div>
                                     </div>
+                                </div>
+
+                                <div class="appearance-letter-spacing">
+                                    <div class="card-head" style="margin-bottom:8px">
+                                        <strong id="oneai-letter-spacing-label">{{ i18n.text('工作台字间距', 'Letter Spacing') }}</strong>
+                                        <span class="size-actions">
+                                            <button *ngIf="appearance.letterSpacing !== defaultLetterSpacing" type="button" class="font-reset-btn"
+                                                (click)="resetAppearanceLetterSpacing()">{{ i18n.text('恢复默认', 'Reset') }}</button>
+                                            <span class="size-pill spacing-pill">{{ formatLetterSpacing(appearance.letterSpacing) }}</span>
+                                        </span>
+                                    </div>
+                                    <label class="font-size-slider">
+                                        <small class="muted">{{ appearanceSpacingRange.min }}</small>
+                                        <input type="range" [attr.aria-label]="i18n.text('工作台字间距', 'Letter Spacing')"
+                                            [min]="appearanceSpacingRange.min" [max]="appearanceSpacingRange.max" [step]="appearanceSpacingRange.step"
+                                            [value]="appearance.letterSpacing" (input)="setAppearanceLetterSpacing($any($event.target).valueAsNumber)">
+                                        <small class="muted">+{{ appearanceSpacingRange.max }}</small>
+                                    </label>
                                 </div>
                             </div>
                         </section>
@@ -797,6 +816,8 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
 
     readonly appearanceSizeRange = interfaceFontSizeRange;
     readonly defaultSize = defaultInterfaceFontSize;
+    readonly appearanceSpacingRange = interfaceLetterSpacingRange;
+    readonly defaultLetterSpacing = defaultInterfaceLetterSpacing;
     readonly shortcuts = workbenchHotkeys;
     readonly cliList = supportedCli;
     readonly icons = { history: 'fa-history', usage: 'fa-chart-bar', settings: 'fa-cog', search: 'fa-search' };
@@ -1437,6 +1458,22 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
         this.error = '';
         try { this.appearance.setFontSize(size); }
         catch { this.error = this.i18n.text('无法保存工作台字号。', 'Unable to save font size.'); }
+    }
+
+    formatLetterSpacing(spacing: number): string {
+        return `${spacing > 0 ? '+' : ''}${spacing.toFixed(1)} px`;
+    }
+
+    setAppearanceLetterSpacing(spacing: number): void {
+        this.error = '';
+        try { this.appearance.setLetterSpacing(spacing); }
+        catch { this.error = this.i18n.text('无法保存工作台字间距。', 'Unable to save letter spacing.'); }
+    }
+
+    resetAppearanceLetterSpacing(): void {
+        this.error = '';
+        try { this.appearance.resetLetterSpacing(); }
+        catch { this.error = this.i18n.text('无法重置工作台字间距。', 'Unable to reset letter spacing.'); }
     }
 
     toggleCliEnvMenu(trigger: HTMLElement, event: MouseEvent): void {
