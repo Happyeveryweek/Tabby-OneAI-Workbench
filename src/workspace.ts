@@ -1150,9 +1150,13 @@ export class WorkspaceService implements OnDestroy {
             if (fresh) this.reviveTimeoutFailedTask(task);
             const safeActivity = this.resolveTaskActivity(task, pane, activity);
             if (safeActivity) this.agyMeterActivities.set(task.id, safeActivity);
-            const tokens = !sessionId || sessionId === task.cliSession?.id ? task.detail?.tokens : undefined;
+            const sameSession = !sessionId || sessionId === task.cliSession?.id;
+            const existingTokens = sameSession ? task.detail?.tokens : undefined;
+            const nextTokens = existingTokens !== undefined && detail.tokens !== undefined
+                ? Math.max(existingTokens, detail.tokens)
+                : (existingTokens ?? (task.cliSession ? undefined : detail.tokens));
             const hasError = safeActivity === 'working' ? false : task.detail?.hasError;
-            task.detail = { ...detail, tokens: detail.tokens ?? tokens, hasError };
+            task.detail = { ...detail, tokens: nextTokens, hasError };
             const screen = pane.frontend?.xterm;
             const tasksRunning = safeActivity !== 'waiting' && hasActiveFooterTasks(screen);
             const screenErr = safeActivity === 'ready' && screen && terminalEditorActivity(screen) === 'error';
