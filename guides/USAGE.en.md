@@ -12,6 +12,8 @@
 - **Automatic Session Discovery**: Right after you add a project directory, you do not need to manually import anything -- the workbench **automatically scans and adds all historical sessions from supported AI CLIs** matching that folder, grouped by CLI alongside the Git branch and runtime badge (`WIN` / `WSL`).
 - Click the **pin icon** on a project row to pin it to the top. Right-click any project to **Start New Session**, **Search Session History…**, **Open Project Folder** (auto-translating WSL paths to `\\wsl.localhost\...`), or **View Project Usage**.
 
+![Add Project, Multi-Account Launch, Close Guard, and Context Menus](../assets/guide-project-and-dialogs.png)
+
 ### 2. Launch & Resume Sessions
 - **New Session**: Right-click a project → **Start New Session** (only CLIs detected in that runtime are listed). Once your first message is written to disk, the sidebar title, prompt history drawer, and token counters bind automatically.
 - **Resume History**: Double-click any historical session in the sidebar to resume it in a native Tabby tab using its exact directory, environment variables, and session ID. If already open, double-clicking focuses the existing pane.
@@ -34,14 +36,30 @@ All states stay synchronized across the **tab bottom `.colorbar`**, **session te
 ### 4. Telemetry Bar, Usage Dashboard & Prompt History Drawer
 - **Live Telemetry Bar**: Dynamically renders only metric pills supported and populated by the active CLI (`Tokens`, `5h / 7d` quota & reset timers, `Model / Effort`, 3-color `Ctx` bar). Codex includes a manual online quota refresh button.
 - **Usage Dashboard**: Click the `Tokens` pill or chart icon to filter cascadingly by **Project → Session → Model** across Last 12 Months (52-week heatmap), This Month, or This Week (daily bar charts), with hover tooltips detailing Input, Cache Read, and Output splits.
-- **Prompt History Drawer**: Click the clock icon (or press `Ctrl-Alt-Shift-H`) to slide out all user prompts for the active session in reverse chronological order with keyword search, expand/collapse, and one-click copy.
+
+![Usage Analytics Dashboard](../assets/usage-dashboard.png)
+
+- **Prompt History Drawer & Global Session Search**: Click the clock icon (or press `Ctrl-Alt-Shift-H`) to slide out all user prompts for the active session in reverse chronological order with keyword search, expand/collapse, and one-click copy; right-click any project for `0 ms` cached cross-CLI session search.
+
+![Global Session Search and Prompt History Drawer](../assets/history-search.png)
 
 ### 5. Settings, Multi-Account Directories & Shortcuts
 Click the **gear icon** at the bottom right of the sidebar (or press `Ctrl-Alt-Shift-O`):
 - **Appearance**: Switch **简体中文 / English** independently of Tabby, adjust font size, search any installed system font, and pick from 16 Eye-Care & Editor themes.
+
+![Appearance and Typography Settings](../assets/appearance-themes.png)
+
 - **CLI Directories**: Configure multiple data directories / accounts for `Codex`, `Claude Code`, `Pi`, `Kimi Code`, `Grok Build`, and `GitHub Copilot`, with real-time path existence badges.
+
+![CLI Environment and Multi-Account Directories](../assets/guide-cli-directories.png)
+
 - **CLI Detection**: Re-scan `PATH` per runtime (`PowerShell 7` or each `WSL` distro) whenever you install a new CLI.
+
+![Per-Runtime AI CLI Detection](../assets/guide-cli-detect.png)
+
 - **Session Management**: Recover sessions previously removed from the workbench (grouped by project, one-click single or group restore).
+
+![Recover Removed Sessions Grouped by Project](../assets/guide-session-recovery.png)
 - **Shortcuts**: Click any shortcut to record a new keybinding with conflict detection and one-click reset:
 
 | Action | Default Shortcut |
