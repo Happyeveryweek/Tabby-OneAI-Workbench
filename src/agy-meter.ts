@@ -9,14 +9,14 @@ import type { AgyStatus } from './agy-status';
 interface AgyMeter {
     command: Command;
     resultFile: string;
-    subscribe(receive: (status: AgyStatus) => void): () => void;
+    subscribe(receive: (status: AgyStatus, fresh?: boolean) => void): () => void;
     dispose(): void;
 }
 
 const meterRoot = join(tmpdir(), 'tabby-oneai-meters');
 const safeId = (taskId: string) => taskId.replace(/[^a-zA-Z0-9._-]/g, '_');
 
-export function watchAgyMeterFile(resultFile: string, receive: (status: AgyStatus) => void, minFreshMtimeMs = 0): () => void {
+export function watchAgyMeterFile(resultFile: string, receive: (status: AgyStatus, fresh?: boolean) => void, minFreshMtimeMs = 0): () => void {
     let disposed = false;
     let last = '';
     const read = () => {
@@ -27,11 +27,11 @@ export function watchAgyMeterFile(resultFile: string, receive: (status: AgyStatu
             if (!disposed && text !== last) {
                 last = text;
                 const parsed = JSON.parse(text) as AgyStatus;
-                if (minFreshMtimeMs > 0 && info && info.mtimeMs < minFreshMtimeMs
-                    && (parsed.activity === 'working' || parsed.activity === 'waiting')) {
+                const stale = Boolean(minFreshMtimeMs > 0 && info && info.mtimeMs < minFreshMtimeMs);
+                if (stale && (parsed.activity === 'working' || parsed.activity === 'waiting')) {
                     parsed.activity = 'ready';
                 }
-                receive(parsed);
+                receive(parsed, !stale);
             }
         }).catch(() => undefined);
     };
@@ -40,20 +40,45 @@ export function watchAgyMeterFile(resultFile: string, receive: (status: AgyStatu
     return () => { disposed = true; unwatchFile(resultFile, read); };
 }
 
+export function extractMeterSettingsArg(options: { command?: string; args?: string[] } | undefined): string | undefined {
+    const args = Array.isArray(options?.args) ? options!.args : [];
+    if (!args.length) return;
+    const idx = args.indexOf('--settings');
+    if (idx >= 0 && typeof args[idx + 1] === 'string') {
+        try {
+            const parsed = JSON.parse(args[idx + 1]);
+            if (typeof parsed?.statusLine?.command === 'string') return args[idx + 1];
+        } catch {}
+    }
+    const encodedIdx = args.findIndex(item => item.toLowerCase() === '-encodedcommand');
+    if (encodedIdx >= 0 && typeof args[encodedIdx + 1] === 'string') {
+        try {
+            const script = Buffer.from(args[encodedIdx + 1], 'base64').toString('utf16le');
+            const match = script.match(/'--settings'\s+'((?:[^']|'')*)'/);
+            if (match?.[1]) {
+                const raw = match[1].replace(/''/g, "'");
+                const parsed = JSON.parse(raw);
+                if (typeof parsed?.statusLine?.command === 'string') return raw;
+            }
+        } catch {}
+    }
+    return undefined;
+}
+
 function extractSettingsCommand(options: { command?: string; args?: string[] } | undefined): string | undefined {
+    const settingsArg = extractMeterSettingsArg(options);
+    if (settingsArg) {
+        try {
+            const parsed = JSON.parse(settingsArg);
+            if (typeof parsed?.statusLine?.command === 'string') return parsed.statusLine.command;
+        } catch {}
+    }
     const args = Array.isArray(options?.args) ? options!.args : [];
     if (!args.length) return;
     const sources = [...args];
     const encodedIdx = args.findIndex(item => item.toLowerCase() === '-encodedcommand');
     if (encodedIdx >= 0 && typeof args[encodedIdx + 1] === 'string') {
         try { sources.push(Buffer.from(args[encodedIdx + 1], 'base64').toString('utf16le')); } catch {}
-    }
-    const idx = args.indexOf('--settings');
-    if (idx >= 0 && typeof args[idx + 1] === 'string') {
-        try {
-            const parsed = JSON.parse(args[idx + 1]);
-            if (typeof parsed?.statusLine?.command === 'string') return parsed.statusLine.command;
-        } catch {}
     }
     for (const chunk of sources) {
         const match = chunk.match(/(['"])(\{"statusLine":[\s\S]*?\})\1/);

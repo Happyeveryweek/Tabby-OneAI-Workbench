@@ -13,7 +13,7 @@ import type { SessionDetails } from './codex-data';
 import { isAbortMessage } from './codex-data';
 import { CliHistory } from './cli-history';
 import type { CliSession } from './cli-history';
-import { prepareAgyMeter, recoverAgyMeter, watchAgyMeterFile } from './agy-meter';
+import { extractMeterSettingsArg, prepareAgyMeter, recoverAgyMeter, watchAgyMeterFile } from './agy-meter';
 import type { AgyStatus } from './agy-status';
 import { CliDirectories, configurableCli, directoryVariables } from './cli-directories';
 import { WorkbenchI18n } from './i18n';
@@ -498,6 +498,8 @@ function pruneStoredTasks(records: TaskRecord[]): TaskRecord[] {
     }
     return kept;
 }
+
+const sessionOpenTimeoutMessage = 'Tabby 未报告终端已启动。请检查终端输出。';
 
 @Injectable()
 export class WorkspaceService implements OnDestroy {
@@ -1128,16 +1130,24 @@ export class WorkspaceService implements OnDestroy {
         return 'working';
     }
 
+    private reviveTimeoutFailedTask(task: Task): void {
+        if (task.status === 'starting' || (task.status === 'failed' && task.error === sessionOpenTimeoutMessage)) {
+            task.error = undefined;
+            this.setTaskStatus(task, 'running');
+        }
+    }
+
     private attachAgyMeter(
         task: Task,
         pane: Tab,
         project: Project,
         dataDirectory: string | undefined,
-        subscribe: (receive: (status: AgyStatus) => void) => () => void,
+        subscribe: (receive: (status: AgyStatus, fresh?: boolean) => void) => () => void,
         events: Subscription,
         dispose?: () => void,
     ): void {
-        const received = subscribe(({ detail, activity, sessionId, transcript }) => this.zone.run(() => {
+        const received = subscribe(({ detail, activity, sessionId, transcript }, fresh = true) => this.zone.run(() => {
+            if (fresh) this.reviveTimeoutFailedTask(task);
             const safeActivity = this.resolveTaskActivity(task, pane, activity);
             if (safeActivity) this.agyMeterActivities.set(task.id, safeActivity);
             const tokens = !sessionId || sessionId === task.cliSession?.id ? task.detail?.tokens : undefined;
@@ -1155,7 +1165,7 @@ export class WorkspaceService implements OnDestroy {
                     task.cliSession = undefined;
                     void this.bindClaudeTranscript(task, project, sessionId, transcript, dataDirectory);
                 }
-            } else if (sessionId && !transcript && cliBrand(task.executable)?.executable === 'agy') {
+            } else if (fresh && sessionId && !transcript && cliBrand(task.executable)?.executable === 'agy') {
                 const prev = this.agyLiveSessionIds.get(task.id);
                 if (prev !== sessionId) {
                     this.agyLiveSessionIds.set(task.id, sessionId);
@@ -1271,6 +1281,9 @@ export class WorkspaceService implements OnDestroy {
             }
             this.bind(task, tab, true);
             boundAny = true;
+            if (this.hasPersistedSession(task)) {
+                void this.syncLivePaneProfile(task);
+            }
             if (!task.detail && (task.codex || task.cliSession || cliBrand(task.executable))) {
                 void this.updateDetails(task, true);
             }
@@ -1368,6 +1381,7 @@ export class WorkspaceService implements OnDestroy {
         const watchSession = () => {
             sessionEvents?.unsubscribe();
             sessionEvents = new Subscription();
+            if (pane.session?.open) this.zone.run(() => this.reviveTimeoutFailedTask(task));
             sessionEvents.add(pane.session?.closed$.subscribe(onSessionClosed));
             sessionEvents.add(pane.session?.destroyed$.subscribe(stopped));
         };
@@ -1376,6 +1390,9 @@ export class WorkspaceService implements OnDestroy {
         events.add(() => sessionEvents?.unsubscribe());
         let inputLine = '';
         const watchInput = () => events.add(pane.frontend?.input$?.subscribe(data => {
+            if (task.status === 'starting' || (task.status === 'failed' && task.error === sessionOpenTimeoutMessage)) {
+                this.zone.run(() => this.reviveTimeoutFailedTask(task));
+            }
             const text = typeof data === 'string' ? data : Buffer.isBuffer(data) ? data.toString('utf8') : String(data ?? '');
             if (/[\r\n]|\x1bOM|\x1b\[13;[0-9;]*u/.test(text)) {
                 this.turnArmed.add(task.id);
@@ -1615,8 +1632,9 @@ export class WorkspaceService implements OnDestroy {
                     this.setActivity(task, 'error');
                 });
             }
-            if (task.status === 'starting' && pane.session?.open) {
-                this.zone.run(() => this.setTaskStatus(task, 'running'));
+            if ((pane.session?.open || hasVisibleTerminalText(output))
+                && (task.status === 'starting' || (task.status === 'failed' && task.error === sessionOpenTimeoutMessage))) {
+                this.zone.run(() => this.reviveTimeoutFailedTask(task));
             }
             if (task.status === 'running' && hasVisibleTerminalText(output)) {
                 if (shouldMarkTaskUnreadOnOutput(task, this.selected, output, this.blurredAt.get(task.id))) {
@@ -1628,58 +1646,78 @@ export class WorkspaceService implements OnDestroy {
                 if (this.isDefaultTaskName(task)) void this.updateDetails(task);
             }
         }));
-        this.waitForSessionOpen(task, pane, events);
+        this.waitForSessionOpen(task, pane, events, restored);
     }
 
-    private waitForSessionOpen(task: Task, pane: Tab, events: Subscription): void {
-        if (pane.session?.open && task.status === 'starting') {
-            this.zone.run(() => this.setTaskStatus(task, 'running'));
+    private waitForSessionOpen(task: Task, pane: Tab, events: Subscription, restored = false): void {
+        if (pane.session?.open) {
+            this.zone.run(() => this.reviveTimeoutFailedTask(task));
             return;
         }
         this.zone.runOutsideAngular(() => {
-            const deadline = Date.now() + 15000;
+            const deadline = Date.now() + 20000;
             const timer = setInterval(() => {
-                if (task.status !== 'starting') return clearInterval(timer);
+                const waitingRevive = task.status === 'starting' || (task.status === 'failed' && task.error === sessionOpenTimeoutMessage);
+                if (!waitingRevive) return clearInterval(timer);
                 if (pane.session?.open) {
-                    this.zone.run(() => this.setTaskStatus(task, 'running'));
+                    this.zone.run(() => this.reviveTimeoutFailedTask(task));
                     clearInterval(timer);
-                } else if (Date.now() >= deadline) {
+                } else if (!restored && task.status === 'starting' && Date.now() >= deadline) {
                     this.zone.run(() => {
                         this.setTaskStatus(task, 'failed');
-                        task.error = 'Tabby 未报告终端已启动。请检查终端输出。';
+                        task.error = sessionOpenTimeoutMessage;
                     });
-                    clearInterval(timer);
                 }
-            }, 180);
+            }, 250);
             events.add(() => clearInterval(timer));
         });
+    }
+
+    private async syncLivePaneProfile(task: Task, parentProject = this.projectFor(task), codexScopeDir?: string): Promise<void> {
+        const pane = this.bindings.get(task.id)?.pane;
+        if (!pane?.profile || !parentProject) return;
+        const project = task.directory ? { ...parentProject, directory: task.directory } : parentProject;
+        const nextTitle = `${task.name} · ${project.name}`;
+        try {
+            if (pane.profile.name !== nextTitle) pane.profile.name = nextTitle;
+        } catch { /* Ignore readonly profile proxy. */ }
+        if (!pane.profile.options) return;
+        const cli = configurableCli(task.executable);
+        const brandExec = cliBrand(task.executable)?.executable;
+        const dataDirectory = task.cliSession?.dataDirectory ?? task.dataDirectory;
+        const baseEnv = cli && dataDirectory ? { [directoryVariables[cli]]: dataDirectory,
+            ...(cli === 'kimi' ? { KIMI_SHARE_DIR: dataDirectory } : {}) } : undefined;
+        const env = brandExec === 'pi' ? { ...baseEnv, PI_PROGRAM_STATUS: '1' } : baseEnv;
+        let command: Command | undefined;
+        if (task.codex) {
+            if (!task.codex.sessionId) return;
+            const directory = codexScopeDir ?? (await this.codex.scope(project.distro, task.codex.accountId).catch(() => undefined))?.directory;
+            if (!directory) return;
+            command = {
+                executable: task.executable,
+                codexHome: directory,
+                args: ['-c', codexTitleOption, 'resume', task.codex.sessionId],
+            };
+        } else if (task.cliSession?.args?.length) {
+            const resumeArgs = [...task.cliSession.args];
+            const existingSettings = (brandExec === 'agy' || cli === 'claude')
+                ? extractMeterSettingsArg(pane.profile.options)
+                : undefined;
+            const args = existingSettings && !resumeArgs.some(arg => /^--settings(?:=|$)/.test(arg))
+                ? ['--settings', existingSettings, ...resumeArgs]
+                : resumeArgs;
+            command = env ? { executable: task.executable, args, env } : { executable: task.executable, args };
+        }
+        if (!command || this.bindings.get(task.id)?.pane !== pane) return;
+        try {
+            pane.profile.options = commandFor(project, command);
+        } catch { /* Keep existing profile options if readonly. */ }
     }
 
     private async restartUpdatedSessionInPlace(task: Task, pane: Tab, events: Subscription): Promise<void> {
         const parent = this.projectFor(task);
         if (parent && pane.profile?.options) {
-            const project = task.directory ? { ...parent, directory: task.directory } : parent;
-            try {
-                const cli = configurableCli(task.executable);
-                const brandExec = cliBrand(task.executable)?.executable;
-                const dataDirectory = task.cliSession?.dataDirectory ?? task.dataDirectory;
-                const baseEnv = cli && dataDirectory ? { [directoryVariables[cli]]: dataDirectory,
-                    ...(cli === 'kimi' ? { KIMI_SHARE_DIR: dataDirectory } : {}) } : undefined;
-                const env = brandExec === 'pi' ? { ...baseEnv, PI_PROGRAM_STATUS: '1' } : baseEnv;
-                let command: Command = env ? { ...task, env } : task;
-                if (task.codex) {
-                    const scope = await this.codex.scope(project.distro, task.codex.accountId);
-                    command = {
-                        executable: task.executable, codexHome: scope.directory,
-                        args: ['-c', codexTitleOption, ...(task.codex.sessionId ? ['resume', task.codex.sessionId] : [])],
-                    };
-                } else if (task.cliSession?.args?.length && !command.args.length) {
-                    command = { ...command, args: [...task.cliSession.args] };
-                }
-                if (!events.closed && this.bindings.get(task.id)?.pane === pane && !(brandExec === 'agy' || cli === 'claude')) {
-                    try { pane.profile.options = commandFor(project, command); } catch { /* Keep existing profile options. */ }
-                }
-            } catch { /* Keep existing profile options when scope lookup fails. */ }
+            try { await this.syncLivePaneProfile(task, parent); } catch { /* Keep existing profile options. */ }
         }
         if (events.closed || this.bindings.get(task.id)?.pane !== pane) return;
         const hostPane = pane as Tab & {
@@ -1758,13 +1796,13 @@ export class WorkspaceService implements OnDestroy {
             .filter((key): key is string => Boolean(key)));
         const keyOf = (item: CliSession) => historyId(project.distro, item.directoryId ?? defaultAccount, item.id, item.executable);
 
-        if (!task.cliSession) {
+        const liveAgyId = executable === 'agy' ? this.agyLiveSessionIds.get(task.id) : undefined;
+        if (!task.cliSession || (liveAgyId && task.cliSession.id !== liveAgyId)) {
             if (task.status !== 'running') return;
-            const liveAgyId = executable === 'agy' ? this.agyLiveSessionIds.get(task.id) : undefined;
             let matched: CliSession | undefined;
             if (liveAgyId) {
                 matched = sessions.find(item => item.id === liveAgyId);
-            } else {
+            } else if (!task.cliSession) {
                 if (!this.turnArmed.has(task.id)) return;
                 const excluded = this.newSessionExcludedKeys.get(task.id);
                 const since = (task.startedAt ?? Date.now()) - 2000;
@@ -1779,14 +1817,16 @@ export class WorkspaceService implements OnDestroy {
             if (!matched) return;
             this.newSessionExcludedKeys.delete(task.id);
             this.zone.run(() => {
+                const switched = Boolean(task.cliSession && task.cliSession.id !== matched!.id);
                 task.cliSession = matched;
-                if (!task.args.length) task.args = matched.args;
-                if (matched.title && !this.isDefaultNameFor(task.executable, matched.title) && this.isDefaultTaskName(task)) {
-                    task.name = matched.title;
+                if (!task.args.length || switched || task.args[0] === matched!.args[0]) task.args = [...matched!.args];
+                if (matched!.title && !this.isDefaultNameFor(task.executable, matched!.title) && (switched || this.isDefaultTaskName(task))) {
+                    task.name = matched!.title;
                     this.bindings.get(task.id)?.pane.setTitle?.(`${task.name} · ${project.name}`);
                 }
-                task.lastActiveAt = Math.max(task.lastActiveAt ?? 0, matched.updatedAt);
+                task.lastActiveAt = Math.max(task.lastActiveAt ?? 0, matched!.updatedAt);
                 this.saveTask(task);
+                void this.syncLivePaneProfile(task, project);
                 void this.loadRecentHistory(project);
             });
             return;
@@ -1805,6 +1845,7 @@ export class WorkspaceService implements OnDestroy {
             if (renamed || fresh.updatedAt > prevUpdated) {
                 task.lastActiveAt = Math.max(task.lastActiveAt ?? 0, fresh.updatedAt);
                 this.saveTask(task);
+                if (renamed) void this.syncLivePaneProfile(task, project);
                 void this.loadRecentHistory(project);
             }
         });
@@ -1950,6 +1991,7 @@ export class WorkspaceService implements OnDestroy {
                 }
                 if (changed) {
                     this.saveTask(task);
+                    void this.syncLivePaneProfile(task, project, scope.directory);
                     void this.loadRecentHistory(project);
                 }
                 task.detail = detail;
@@ -1979,6 +2021,7 @@ export class WorkspaceService implements OnDestroy {
                     promptFile, updatedAt: Date.now() };
                 if (!task.args.length || (task.args.length === 2 && task.args[0] === '--resume')) task.args = task.cliSession.args;
                 this.saveTask(task);
+                void this.syncLivePaneProfile(task, project);
                 void this.updateDetails(task, true);
             });
         } catch {
