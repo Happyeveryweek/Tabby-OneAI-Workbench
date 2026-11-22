@@ -17,13 +17,13 @@
 **Design Philosophy: Project-First, Not Tool-First.**
 In real AI-assisted engineering, **a single project often involves multiple AI CLIs working together** (e.g., Codex for backend architecture, Claude Code for UI, Antigravity for multi-step debugging, Copilot for quick edits), and **each CLI holds multiple parallel or historical sessions**. Instead of scattering them across unnamed tabs, this workbench unifies everything around a **`Project → AI CLI → Session`** hierarchy:
 
-- **Tab chaos & lost sessions** → **Add a project once to auto-import all supported AI CLI sessions**
+- **Tab chaos & lost sessions** → **Add a project once to auto-import all supported AI CLI sessions**<br>
   Simply add your Windows or WSL 2 project directory -- the workbench **automatically scans and populates existing historical sessions from all supported AI CLIs** under that project. Stop hunting for `--resume <uuid>`; double-click any session to focus or resume it in its exact directory and runtime.
-- **Polling background agents by hand** → **Real-time 5-state sync & smart `New` unread badges**
+- **Polling background agents by hand** → **Real-time 5-state sync & smart `New` unread badges**<br>
   See at a glance which agent is thinking (`Running`), waiting for tool approval (`Waiting`), stopped on an error (`Error`), or idle (`Ready`) across the breathing tab bar, status bar, and sidebar. Completed background tasks light up a `New` badge that clears once viewed.
-- **GUI chat wrappers break native CLI workflows** → **100% official native Tabby terminal**
+- **GUI chat wrappers break native CLI workflows** → **100% official native Tabby terminal**<br>
   Zero compromises on slash commands, interactive `y/n` prompts, full-screen diffs, Vim keybindings, or native split panes. AI CLI sessions live right beside your regular PowerShell 7, WSL `bash`, and SSH tabs.
-- **Invisible context saturation & rate limits** → **Live telemetry bar + 3-tier usage dashboard**
+- **Invisible context saturation & rate limits** → **Live telemetry bar + 3-tier usage dashboard**<br>
   Monitor active model, context window fill (3-color warning bar), cumulative tokens, and `5h / 7d` quota reset countdowns in real time, and click straight into a 52-week heatmap and per-model breakdown.
 
 ---

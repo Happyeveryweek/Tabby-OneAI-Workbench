@@ -57,7 +57,7 @@ Click the **gear icon** at the bottom right of the sidebar (or press `Ctrl-Alt-S
 
 ![Per-Runtime AI CLI Detection](../assets/guide-cli-detect.png)
 
-- **Session Management**: Recover sessions previously removed from the workbench (grouped by project, one-click single or group restore).
+- **Session Management (Hide Only -- Never Deletes Local Logs)**: Removing a session from the sidebar **only hides unwanted items from the workbench session list and never deletes your underlying CLI session records**. Filter by project or CLI here anytime to restore individual sessions or entire project groups in one click.
 
 ![Recover Removed Sessions Grouped by Project](../assets/guide-session-recovery.png)
 - **Shortcuts**: Click any shortcut to record a new keybinding with conflict detection and one-click reset:
