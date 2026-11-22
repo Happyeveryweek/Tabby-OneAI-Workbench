@@ -53,7 +53,9 @@ export function parseAgyStatus(text: string, now = Date.now()): AgyStatus | unde
     const fiveHour = modelFamily && !argonWeekly ? (bucket(modelFamily + '-5h') ?? bucket('gemini-5h')) : undefined;
     const weekly = argonWeekly ?? (modelFamily ? (bucket(modelFamily + '-weekly') ?? bucket('gemini-weekly')) : undefined);
     const quota = fiveHour || weekly ? { fiveHour, weekly, source: 'agy' as const, updatedAt: now } : undefined;
-    const bgTasks = count(data.active_tasks) ?? count(data.background_tasks) ?? count(data.running_tasks) ?? 0;
+    const bgTasks = (count(data.active_tasks) ?? count(data.background_tasks) ?? count(data.running_tasks) ?? 0)
+        + (count(data.active_subagents) ?? count(data.running_subagents) ?? count(data.subagent_count)
+            ?? (Array.isArray(data.subagents) ? data.subagents.length : count(data.subagents)) ?? 0);
     const activity = data.tool_confirmation_pending ? 'waiting'
         : (['thinking', 'working', 'tool_use'].includes(data.agent_state) || bgTasks > 0) ? 'working'
         : data.agent_state === 'idle' ? 'ready' : undefined;

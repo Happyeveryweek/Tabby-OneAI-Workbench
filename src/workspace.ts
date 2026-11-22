@@ -238,13 +238,16 @@ export function terminalEditorActivity(screen: TerminalScreen): CodexActivity | 
     const border = /^[╭╰┌└]?[─━═]{12,}[╮╯┐┘]?$/;
     const workingBorder = /^[─━═]+\s+(?:[\u2800-\u28ff●•·*▪■▫⬝◦]\s*)?(?:Working|Thinking|Compacting|Auto-compacting|Retrying|Summarizing)\b/i;
     const workingIndicator = /^(?:[\u2800-\u28ff●•·*▪■▫⬝◦]\s*)?(?:Working|Thinking|Compacting|Auto-compacting|Retrying|Summarizing)\b/i;
-    const bottom = buffer.type === 'alternate' ? screen.rows - 1 : Math.min(screen.rows - 1, buffer.cursorY + 12);
-    const recentRows = Array.from({ length: Math.min(12, bottom + 1) }, (_, offset) => lineAt(bottom - offset));
+    const bottom = screen.rows - 1;
+    const recentRows = Array.from({ length: Math.min(16, bottom + 1) }, (_, offset) => lineAt(bottom - offset));
     if (recentRows.some(line => /(?:Do you want to proceed|Allow once|Permission required)\b/i.test(line))
         && recentRows.some(line => /(?:Esc to cancel|Yes, allow|Deny|\[y\/n\]|\(y\/n\))/i.test(line))) {
         return 'waiting';
     }
-    if (recentRows.some(line => /(?:^|[\s│┃▌(\[•·▪■▫⬝\u2800-\u28ff])(?:esc|ctrl\+c)\s+(?:to\s+)?(?:interrupt|cancel|stop)(?:\s|\)|\]|$)/i.test(line))) {
+    if (recentRows.some(line => /(?:^|[\s│┃▌(\[•·▪■▫⬝\u2800-\u28ff])(?:esc|ctrl\+c)\s+(?:(?:again\s+)?to\s+|again\s+to\s+)?(?:interrupt|cancel|stop)(?:\s|\)|\]|$)/i.test(line))) {
+        return 'working';
+    }
+    if (hasActiveFooterTasks(screen)) {
         return 'working';
     }
     let lower = -1;
@@ -259,7 +262,17 @@ export function terminalEditorActivity(screen: TerminalScreen): CodexActivity | 
             return 'working';
         } else if (border.test(line)) {
             if (lower - row <= 12 && workingIndicator.test(lineAt(row - 1))) return 'working';
-            return hasRecentErrorAbove(lineAt, row) ? 'error' : hasActiveFooterTasks(screen) ? 'working' : 'ready';
+            return hasRecentErrorAbove(lineAt, row) ? 'error' : 'ready';
+        }
+    }
+    // Fallback for borderless shaded input boxes (e.g. '>' prompt above '? for shortcuts' footer).
+    if (recentRows.some(line => /\?\s*for shortcuts\b/i.test(line))) {
+        for (let row = bottom; row >= Math.max(0, bottom - 18); row--) {
+            const line = lineAt(row);
+            if (/^(?:[│┃▌]\s*)?[>›❯](?:\s|$)/.test(line)) {
+                if (row > 0 && workingIndicator.test(lineAt(row - 1))) return 'working';
+                return hasRecentErrorAbove(lineAt, row) ? 'error' : 'ready';
+            }
         }
     }
 }
@@ -269,24 +282,24 @@ export function hasActiveFooterTasks(screen?: TerminalScreen): boolean {
     const buffer = screen.buffer.active;
     const lineAt = (row: number) => buffer.getLine(buffer.baseY + row)?.translateToString(true).trim() ?? '';
     const border = /^[╭╰┌└]?[─━═]{12,}[╮╯┐┘]?$/;
-    const bottom = buffer.type === 'alternate' ? screen.rows - 1 : Math.min(screen.rows - 1, buffer.cursorY + 12);
+    const bottom = screen.rows - 1;
     const footerRows: string[] = [];
     let hasPromptOrBorderAbove = false;
-    for (let row = bottom; row >= Math.max(0, bottom - 14); row--) {
+    for (let row = bottom; row >= Math.max(0, bottom - 22); row--) {
         const line = lineAt(row);
         if (!line) continue;
-        if (/^[>›❯](?:\s|$)/.test(line) || border.test(line)) {
+        if (/^(?:[│┃▌]\s*)?[>›❯](?:\s|$)/.test(line) || border.test(line)) {
             hasPromptOrBorderAbove = true;
             break;
         }
         footerRows.push(line);
-        if (footerRows.length >= 10) break;
+        if (footerRows.length >= 16) break;
     }
     if (!hasPromptOrBorderAbove) return false;
     return footerRows.some(line =>
-        /(?:·|\s)[1-9]\d*\s+(?:task\(s\)|background\s+tasks?|local\s+agents?)(?:\s|$|·)/i.test(line)
-        || (/·\s*\/tasks\b/i.test(line) && /\b[1-9]\d*\b/.test(line))
-        || /^[\u2800-\u28ff●•·*▪■▫⬝◦]\s+(?:\[\d{2}:\d{2}:\d{2}\]\s+)?.*\s+(?:running|in progress)\s*$/i.test(line));
+        /(?:·|\s|^)[1-9]\d*\s+(?:tasks?|task\(s\)|subagents?|subagent\(s\)|agents?|agent\(s\)|background\s+tasks?|local\s+agents?)(?:\s|$|·)/i.test(line)
+        || (/·\s*\/(?:tasks|subagents|agents)\b/i.test(line) && /\b[1-9]\d*\b/.test(line))
+        || /^[\u2800-\u28ff●•·*▪■▫⬝◦]\s+(?:(?:Agent|Subagent|Task|Background\s+task)\s*\(|(?:\[\d{2}:\d{2}:\d{2}\]\s+)?.*\s+(?:running|in progress|working|thinking)\s*$|.*·\s*(?:\d+h\s*)?(?:\d+m\s*)?\d+s\s*$)/i.test(line));
 }
 
 export function grokActivity(screen: TerminalScreen): CodexActivity | undefined {
@@ -1088,7 +1101,7 @@ export class WorkspaceService implements OnDestroy {
         if (activity !== 'working') return activity;
         const screen = pane.frontend?.xterm;
         if (task.codex && codexScreenIsIdle(screen)) return 'ready';
-        if (!this.turnArmed.has(task.id) && !hasScreenInterrupt(screen)) return 'ready';
+        if (!this.turnArmed.has(task.id) && !hasScreenInterrupt(screen) && !hasActiveFooterTasks(screen)) return 'ready';
         return 'working';
     }
 
@@ -1432,7 +1445,7 @@ export class WorkspaceService implements OnDestroy {
                     const runUpdate = () => {
                         throttleTimer = undefined;
                         lastRun = Date.now();
-                        if (hasScreenInterrupt(screen)) this.turnArmed.add(task.id);
+                        if (hasScreenInterrupt(screen) || hasActiveFooterTasks(screen)) this.turnArmed.add(task.id);
                         const activity = this.resolveTaskActivity(task, pane, readActivity(screen));
                         if (executable === 'agy' && task.detail?.quota) {
                             const meterActivity = this.agyMeterActivities.get(task.id);
