@@ -21,14 +21,14 @@
 
 ```powershell
 $plugins = "$env:APPDATA\tabby\plugins\node_modules"
-$zip = "$env:TEMP\tabby-oneai-v0.2.13.zip"
+$zip = "$env:TEMP\tabby-oneai-v1.0.0.zip"
 New-Item -ItemType Directory -Path $plugins -Force | Out-Null
-Invoke-WebRequest -Uri "https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/download/v0.2.13/tabby-oneai-v0.2.13.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/download/v1.0.0/tabby-oneai-v1.0.0.zip" -OutFile $zip
 Expand-Archive -LiteralPath $zip -DestinationPath $plugins -Force
 Remove-Item -LiteralPath $zip -Force
 ```
 
-执行完成后**重启 Tabby**，左侧即会出现 **AI 工作台 (`v0.2.13`)** 常驻侧栏。
+执行完成后**重启 Tabby**，左侧即会出现 **AI 工作台 (`v1.0.0`)** 常驻侧栏。
 
 > 后续升级新版本时，直接将命令里的版本号替换为最新版本重新执行覆盖即可，**不会丢失任何已添加的项目和配置**。
 
@@ -36,12 +36,12 @@ Remove-Item -LiteralPath $zip -Force
 
 ### 方式二：图形界面手动下载解压
 
-1. 前往 [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest) 下载最新版本的 **`tabby-oneai-v0.2.13.zip`**；
+1. 前往 [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest) 下载最新版本的 **`tabby-oneai-v1.0.0.zip`**；
 2. 按 `Win + R` 打开「运行」，输入 **`%APPDATA%\tabby`** 并回车打开 Tabby 配置根目录，依次进入 `plugins` → `node_modules`：
    - **首次安装 Tabby 插件时，`plugins` 或 `node_modules` 目录可能还不存在**，请先在 `%APPDATA%\tabby` 下手动新建 `plugins` 文件夹，再在 `plugins` 内新建 `node_modules` 文件夹；
 3. **压缩包内已自带一层 `tabby-oneai` 文件夹**，请将压缩包里的 `tabby-oneai` 文件夹直接放入 `node_modules` 目录下：
    - 必须保留 `tabby-oneai` 这一层目录；
-   - **不要多套一层**（例如 `node_modules\tabby-oneai-v0.2.13\tabby-oneai` 或 `node_modules\tabby-oneai\tabby-oneai` 会导致 Tabby 无法识别插件）。
+   - **不要多套一层**（例如 `node_modules\tabby-oneai-v1.0.0\tabby-oneai` 或 `node_modules\tabby-oneai\tabby-oneai` 会导致 Tabby 无法识别插件）。
 
 解压后的最终目录结构应与下方完全一致：
 

@@ -2,7 +2,7 @@
 
 **把 8 大主流 AI Coding CLI 收拢进官方 Tabby -- 不换终端、零功能阉割，让多项目、多 Agent 并行开发一眼可控**
 
-`v0.2.13` · `Tabby v1.0.238+` · `Windows (PowerShell 7) & WSL 2` · `MIT License`
+`v1.0.0` · `Tabby v1.0.238+` · `Windows (PowerShell 7) & WSL 2` · `MIT License`
 
 **[简体中文](README.md) | [English](README.en.md)**
 
@@ -72,16 +72,16 @@
 
 ```powershell
 $plugins = "$env:APPDATA\tabby\plugins\node_modules"
-$zip = "$env:TEMP\tabby-oneai-v0.2.13.zip"
+$zip = "$env:TEMP\tabby-oneai-v1.0.0.zip"
 New-Item -ItemType Directory -Path $plugins -Force | Out-Null
-Invoke-WebRequest -Uri "https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/download/v0.2.13/tabby-oneai-v0.2.13.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/download/v1.0.0/tabby-oneai-v1.0.0.zip" -OutFile $zip
 Expand-Archive -LiteralPath $zip -DestinationPath $plugins -Force
 Remove-Item -LiteralPath $zip -Force
 ```
 
 **方式二：手动下载压缩包解压**
 
-1. 从 [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest) 下载 `tabby-oneai-v0.2.13.zip`；
+1. 从 [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest) 下载 `tabby-oneai-v1.0.0.zip`；
 2. 将压缩包内自带的 `tabby-oneai` 文件夹放入 `%APPDATA%\tabby\plugins\node_modules\`（若没有 `plugins` 或 `node_modules` 目录请先手动新建）；
 3. 重启 Tabby 即可在左侧看到 **AI 工作台**。
 
