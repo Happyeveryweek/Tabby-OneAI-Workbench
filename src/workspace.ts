@@ -265,8 +265,8 @@ export function terminalEditorActivity(screen: TerminalScreen): CodexActivity | 
             return hasRecentErrorAbove(lineAt, row) ? 'error' : 'ready';
         }
     }
-    // Fallback for borderless shaded input boxes (e.g. '>' prompt above '? for shortcuts' footer).
-    if (recentRows.some(line => /\?\s*for shortcuts\b/i.test(line))) {
+    // Fallback for borderless shaded input boxes (e.g. '>' prompt above '? for shortcuts' or mode footer).
+    if (recentRows.some(line => /\?\s*for shortcuts\b|\b(?:accept-edits|acceptEdits|auto-edit|plan|default)\s*·/i.test(line))) {
         for (let row = bottom; row >= Math.max(0, bottom - 18); row--) {
             const line = lineAt(row);
             if (/^(?:[│┃▌]\s*)?[>›❯](?:\s|$)/.test(line)) {
@@ -523,6 +523,8 @@ export class WorkspaceService implements OnDestroy {
     private readonly bindings = new Map<string, { pane: Tab; events: Subscription }>();
     private readonly blurredAt = new Map<string, number>();
     private readonly turnArmed = new Set<string>();
+    private readonly newSessionExcludedKeys = new Map<string, Set<string>>();
+    private readonly agyLiveSessionIds = new Map<string, string>();
     private readonly updatingTasks = new Map<string, { startedAt: number; output: string; restarting?: boolean }>();
     private readonly titleIds = new Map<string, string>();
     private readonly claudeTranscripts = new Map<string, string>();
@@ -935,7 +937,11 @@ export class WorkspaceService implements OnDestroy {
     async createTask(project: Project, name: string, command: Command, codex?: TaskRecord['codex'], directory?: string): Promise<void> {
         const cli = configurableCli(command.executable);
         const dataDirectory = cli ? this.cliDirectories.preferred(cli, project.distro)?.directory : undefined;
-        await this.start(this.newTask({ id: randomUUID(), projectId: project.id, name, ...command, codex, directory, dataDirectory }));
+        const now = Date.now();
+        await this.start(this.newTask({
+            id: randomUUID(), projectId: project.id, name, ...command, codex, directory, dataDirectory,
+            lastActiveAt: now,
+        }));
     }
 
     private newTask(record: TaskRecord): Task {
@@ -960,6 +966,20 @@ export class WorkspaceService implements OnDestroy {
         if (!parent) return;
         const project = task.directory ? { ...parent, directory: task.directory } : parent;
         this.release(task);
+        const isBrandNewSession = !task.cliSession && !task.codex?.sessionId && !task.args.length;
+        let newSessionExcluded: Set<string> | undefined;
+        if (isBrandNewSession) {
+            newSessionExcluded = new Set<string>();
+            for (const other of this.tasksFor(parent)) {
+                const key = this.taskSessionKey(other);
+                if (key) newSessionExcluded.add(key);
+            }
+            for (const entry of [...(this.projectHistory.get(parent.id) ?? []), ...(this.allProjectHistory.get(parent.id) ?? [])]) {
+                newSessionExcluded.add(this.entryKey(entry));
+            }
+            task.startedAt = Date.now();
+            task.lastActiveAt = task.startedAt;
+        }
         this.setTaskStatus(task, 'starting');
         task.error = undefined;
         this.startingTask = task;
@@ -974,12 +994,14 @@ export class WorkspaceService implements OnDestroy {
             const baseEnv = cli && dataDirectory ? { [directoryVariables[cli]]: dataDirectory,
                 ...(cli === 'kimi' ? { KIMI_SHARE_DIR: dataDirectory } : {}) } : undefined;
             const env = brandExec === 'pi' ? { ...baseEnv, PI_PROGRAM_STATUS: '1' } : baseEnv;
-            let command: Command = env ? { ...task, env } : task;
+            let command: Command = env
+                ? { executable: task.executable, args: isBrandNewSession ? [] : [...task.args], env }
+                : { executable: task.executable, args: isBrandNewSession ? [] : [...task.args] };
             if (task.codex) {
                 const scope = await this.codex.scope(project.distro, task.codex.accountId);
                 command = {
                     executable: task.executable, codexHome: scope.directory,
-                    args: ['-c', codexTitleOption, ...(task.codex.sessionId ? ['resume', task.codex.sessionId] : [])],
+                    args: ['-c', codexTitleOption, ...(!isBrandNewSession && task.codex.sessionId ? ['resume', task.codex.sessionId] : [])],
                 };
             } else if (cliBrand(task.executable)?.executable === 'agy' || cli === 'claude') {
                 task.detail = undefined;
@@ -995,6 +1017,7 @@ export class WorkspaceService implements OnDestroy {
             task.lastActiveAt = now;
             try { this.saveTask(task); } catch { /* The terminal session has already started. */ }
             this.bind(task, pane);
+            if (newSessionExcluded) this.newSessionExcludedKeys.set(task.id, newSessionExcluded);
             if (meter) {
                 const link = meter;
                 const events = this.bindings.get(task.id)!.events;
@@ -1072,7 +1095,7 @@ export class WorkspaceService implements OnDestroy {
                 this.treeVersion++;
             }
             this.folded.delete(task.projectId);
-            if (task.status === 'running' || !task.detail) {
+            if (task.status === 'running' || (task.status !== 'starting' && !task.detail && Boolean(task.codex?.sessionId || task.cliSession))) {
                 void this.updateDetails(task, !task.detail);
             }
         }
@@ -1131,6 +1154,14 @@ export class WorkspaceService implements OnDestroy {
                 if (task.cliSession?.id !== sessionId) {
                     task.cliSession = undefined;
                     void this.bindClaudeTranscript(task, project, sessionId, transcript, dataDirectory);
+                }
+            } else if (sessionId && !transcript && cliBrand(task.executable)?.executable === 'agy') {
+                const prev = this.agyLiveSessionIds.get(task.id);
+                if (prev !== sessionId) {
+                    this.agyLiveSessionIds.set(task.id, sessionId);
+                    if (!task.cliSession || task.cliSession.id !== sessionId) {
+                        void this.updateDetails(task, true);
+                    }
                 }
             }
         }));
@@ -1352,6 +1383,19 @@ export class WorkspaceService implements OnDestroy {
                 inputLine = inputLine.slice(0, -1);
             } else if (text === '\x03' || text === '\x15' || text.startsWith('\x1b')) {
                 inputLine = '';
+                if ((text === '\x03' || text === '\x1b') && task.activity === 'working' && !this.updatingTasks.has(task.id)) {
+                    const interruptTimer = setTimeout(() => {
+                        if (events.closed || this.bindings.get(task.id)?.pane !== pane || this.updatingTasks.has(task.id)) return;
+                        const screen = pane.frontend?.xterm;
+                        if (!hasScreenInterrupt(screen) && !hasActiveFooterTasks(screen)) {
+                            if (this.agyMeterActivities.get(task.id) === 'working') {
+                                this.agyMeterActivities.set(task.id, 'ready');
+                            }
+                            this.zone.run(() => this.setActivity(task, 'ready'));
+                        }
+                    }, 180);
+                    events.add(() => clearTimeout(interruptTimer));
+                }
             } else if (/^[\x20-\x7e]+$/.test(text)) {
                 inputLine = (inputLine + text).slice(-64);
             }
@@ -1707,12 +1751,25 @@ export class WorkspaceService implements OnDestroy {
         const keyOf = (item: CliSession) => historyId(project.distro, item.directoryId ?? defaultAccount, item.id, item.executable);
 
         if (!task.cliSession) {
-            const since = (task.startedAt ?? task.lastActiveAt ?? 0) - 30000;
-            const matched = sessions.find(item => {
-                const key = keyOf(item);
-                return item.updatedAt >= since && !attached.has(key) && !this.removedSessions.some(rem => rem.sessionKey === key);
-            });
+            if (task.status !== 'running') return;
+            const liveAgyId = executable === 'agy' ? this.agyLiveSessionIds.get(task.id) : undefined;
+            let matched: CliSession | undefined;
+            if (liveAgyId) {
+                matched = sessions.find(item => item.id === liveAgyId);
+            } else {
+                if (!this.turnArmed.has(task.id)) return;
+                const excluded = this.newSessionExcludedKeys.get(task.id);
+                const since = (task.startedAt ?? Date.now()) - 2000;
+                matched = sessions.find(item => {
+                    const key = keyOf(item);
+                    return item.updatedAt >= since
+                        && !attached.has(key)
+                        && !excluded?.has(key)
+                        && !this.removedSessions.some(rem => rem.sessionKey === key);
+                });
+            }
             if (!matched) return;
+            this.newSessionExcludedKeys.delete(task.id);
             this.zone.run(() => {
                 task.cliSession = matched;
                 if (!task.args.length) task.args = matched.args;
@@ -1750,6 +1807,8 @@ export class WorkspaceService implements OnDestroy {
         this.bindings.delete(task.id);
         this.blurredAt.delete(task.id);
         this.turnArmed.delete(task.id);
+        this.newSessionExcludedKeys.delete(task.id);
+        this.agyLiveSessionIds.delete(task.id);
         this.updatingTasks.delete(task.id);
         this.titleIds.delete(task.id);
         this.claudeTranscripts.delete(task.id);
@@ -1826,19 +1885,21 @@ export class WorkspaceService implements OnDestroy {
             const marker = this.titleIds.get(task.id);
             const cwd = task.directory ?? project.directory;
             let sessionId = codex.sessionId;
-            if (marker && !sessionId) sessionId = await this.codex.match(scope, cwd, marker);
-            if (!sessionId) {
+            if (marker && !sessionId && task.status === 'running') sessionId = await this.codex.match(scope, cwd, marker);
+            if (!sessionId && task.status === 'running' && this.turnArmed.has(task.id)) {
                 const recent = await this.codex.history(scope, cwd, 10, true);
                 const attached = new Set(this.tasksFor(project)
                     .filter(other => other.id !== task.id)
                     .map(other => this.taskSessionKey(other))
                     .filter((key): key is string => Boolean(key)));
-                const since = (task.startedAt ?? task.lastActiveAt ?? 0) - 30000;
+                const excluded = this.newSessionExcludedKeys.get(task.id);
+                const since = (task.startedAt ?? Date.now()) - 2000;
                 const matched = recent.find(entry => {
                     const key = this.entryKey(entry);
-                    return entry.updatedAt >= since && !attached.has(key) && !this.isHistoryRemoved(entry);
+                    return entry.updatedAt >= since && !attached.has(key) && !excluded?.has(key) && !this.isHistoryRemoved(entry);
                 });
                 sessionId = matched?.id;
+                if (sessionId) this.newSessionExcludedKeys.delete(task.id);
             }
             const detail = await this.codex.details(scope, sessionId);
             if (this.titleIds.get(task.id) !== marker) return;
@@ -1853,7 +1914,7 @@ export class WorkspaceService implements OnDestroy {
                         this.removedSessions = load(removedSessionsKey);
                     }
                 }
-                if (detail?.summary && !detail.summary.startsWith('/') && this.isDefaultTaskName(task)) {
+                if (sessionId && detail?.summary && !detail.summary.startsWith('/') && this.isDefaultTaskName(task)) {
                     task.name = detail.summary;
                     this.bindings.get(task.id)?.pane.setTitle?.(`${task.name} · ${project.name}`);
                     changed = true;

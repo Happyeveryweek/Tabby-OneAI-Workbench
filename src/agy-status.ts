@@ -53,11 +53,24 @@ export function parseAgyStatus(text: string, now = Date.now()): AgyStatus | unde
     const fiveHour = modelFamily && !argonWeekly ? (bucket(modelFamily + '-5h') ?? bucket('gemini-5h')) : undefined;
     const weekly = argonWeekly ?? (modelFamily ? (bucket(modelFamily + '-weekly') ?? bucket('gemini-weekly')) : undefined);
     const quota = fiveHour || weekly ? { fiveHour, weekly, source: 'agy' as const, updatedAt: now } : undefined;
-    const bgTasks = (count(data.active_tasks) ?? count(data.background_tasks) ?? count(data.running_tasks) ?? 0)
-        + (count(data.active_subagents) ?? count(data.running_subagents) ?? count(data.subagent_count)
-            ?? (Array.isArray(data.subagents) ? data.subagents.length : count(data.subagents)) ?? 0);
+    const runningSubagents = Array.isArray(data.subagents)
+        ? data.subagents.filter(agent => {
+            const st = typeof (agent as { status?: unknown } | null)?.status === 'string'
+                ? ((agent as { status: string }).status).toLowerCase()
+                : '';
+            return st === 'running' || st === 'working' || st === 'thinking' || st === 'in_progress';
+        }).length
+        : (count(data.active_subagents) ?? count(data.running_subagents) ?? 0);
+    const bgTasks = (count(data.task_count) ?? count(data.active_tasks) ?? count(data.background_tasks) ?? count(data.running_tasks) ?? 0)
+        + runningSubagents;
     const activity = data.tool_confirmation_pending ? 'waiting'
         : (['thinking', 'working', 'tool_use'].includes(data.agent_state) || bgTasks > 0) ? 'working'
         : data.agent_state === 'idle' ? 'ready' : undefined;
-    return { detail: { model, effort, context, quota, tokens: input === undefined && output === undefined ? undefined : (input ?? 0) + (output ?? 0) }, activity };
+    const rawSessionId = [data.conversation_id, data.session_id].find(value => typeof value === 'string' && value.trim())?.trim();
+    const sessionId = rawSessionId && /^[a-zA-Z0-9._-]+$/.test(rawSessionId) ? rawSessionId : undefined;
+    return {
+        detail: { model, effort, context, quota, tokens: input === undefined && output === undefined ? undefined : (input ?? 0) + (output ?? 0) },
+        activity,
+        sessionId,
+    };
 }
