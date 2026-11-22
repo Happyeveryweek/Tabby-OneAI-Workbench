@@ -486,7 +486,7 @@ function pruneStoredTasks(records: TaskRecord[]): TaskRecord[] {
     for (const item of sorted) {
         const hasHistoryLink = Boolean(item.cliSession?.id || item.codex?.sessionId);
         if (!hasHistoryLink) {
-            kept.push(item);
+            if (!isTrackedAiTask(item)) kept.push(item);
             continue;
         }
         const count = (counts.get(item.projectId) ?? 0) + 1;
@@ -1319,8 +1319,14 @@ export class WorkspaceService implements OnDestroy {
                 this.zone.run(() => this.setActivity(task, 'working'));
             }
         };
+        const shouldDiscardEmpty = () =>
+            !task.error && !this.updatingTasks.has(task.id) && isTrackedAiTask(task) && !this.hasPersistedSession(task);
         const stopped = () => {
             if (this.updatingTasks.get(task.id)?.restarting) return;
+            if (shouldDiscardEmpty()) {
+                this.zone.run(() => this.discardEmptyTask(task));
+                return;
+            }
             this.zone.run(() => this.setTaskStatus(task, task.error ? 'failed' : 'stopped'));
         };
         const onSessionClosed = () => {
@@ -1544,8 +1550,10 @@ export class WorkspaceService implements OnDestroy {
         }
         events.add(pane.destroyed$.subscribe(() => {
             const wasSelected = this.selected === task;
+            const discard = shouldDiscardEmpty();
             this.release(task);
-            stopped();
+            if (discard) this.zone.run(() => this.discardEmptyTask(task));
+            else stopped();
             if (wasSelected) this.watchFocus();
         }));
         let startupOutput = '';
@@ -1800,6 +1808,27 @@ export class WorkspaceService implements OnDestroy {
                 void this.loadRecentHistory(project);
             }
         });
+    }
+
+    private hasPersistedSession(task: Task): boolean {
+        return Boolean(task.cliSession?.id || task.codex?.sessionId);
+    }
+
+    private discardEmptyTask(task: Task): void {
+        this.release(task);
+        const before = this.tasks.length;
+        this.tasks = this.tasks.filter(item => item.id !== task.id);
+        if (this.selected === task) this.selectTask(null);
+        try {
+            const records = load<TaskRecord>(tasksKey);
+            const next = records.filter(entry => entry.id !== task.id);
+            if (next.length !== records.length) {
+                localStorage.setItem(tasksKey, JSON.stringify(next));
+            }
+        } catch { /* Ignore storage quota errors. */ }
+        if (before !== this.tasks.length) this.treeVersion++;
+        const project = this.projectFor(task);
+        if (project) void this.loadRecentHistory(project);
     }
 
     private release(task: Task): void {

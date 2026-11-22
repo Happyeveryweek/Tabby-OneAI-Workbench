@@ -1008,22 +1008,23 @@ export class ProjectsComponent implements OnInit, OnDestroy {
     selector: 'oneai-status',
     styles: [theme, `
         :host { display:block; flex:none; min-width:0; background:var(--oneai-surface); container-type:inline-size }
-        .bar { display:flex; align-items:center; padding:5px 12px; gap:8px; min-height:38px; border-bottom:1px solid var(--oneai-line) }
+        .bar { display:flex; align-items:center; padding:5px 12px; gap:8px; min-height:38px; border-bottom:1px solid var(--oneai-line); min-width:0 }
         .icon { color:var(--oneai-accent) }
         strong { font-weight:600 }
-        .hint { margin-inline-start:auto; font-size:var(--oneai-size-meta) }
+        .session-title { flex:0 1 auto; min-width:0 }
+        .hint { flex:0 1 auto; min-width:0; margin-inline-start:auto; font-size:var(--oneai-size-meta) }
         .cli-name { display:inline-flex; align-items:center; gap:6px; flex:none; font-weight:600; }
         .session-origin { display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:7px;
             border:1px solid var(--oneai-line); background:var(--palette-panel,color-mix(in srgb,currentColor 4%,transparent));
-            min-width:0; font-size:var(--oneai-size-caption); white-space:nowrap; }
-        .origin-project { color:var(--palette-fg-muted,inherit); opacity:.88; }
-        .origin-sep { opacity:.4; }
+            flex:none; min-width:0; font-size:var(--oneai-size-caption); white-space:nowrap; }
+        .origin-project { color:var(--palette-fg-muted,inherit); opacity:.88; max-width:12em; }
+        .origin-sep { opacity:.4; flex:none; }
         .origin-runtime { flex:none; font-family:var(--oneai-mono-font,Consolas,monospace); font-size:var(--oneai-size-small); }
         .origin-runtime.wsl { color:var(--oneai-accent); }
 
-        .metrics { margin-inline-start:auto; display:flex; gap:6px; align-items:center;
+        .metrics { margin-inline-start:auto; display:flex; gap:6px; align-items:center; flex:none;
             font:var(--oneai-size-caption) var(--oneai-mono-font,Consolas,monospace); white-space:nowrap; }
-        .metric-pill { display:inline-flex; align-items:center; gap:5px; height:26px; padding:0 8px; border-radius:7px;
+        .metric-pill { display:inline-flex; align-items:center; gap:5px; height:26px; padding:0 8px; border-radius:7px; flex:none;
             background:var(--palette-panel,color-mix(in srgb,currentColor 4%,transparent)); border:1px solid var(--oneai-line);
             font-variant-numeric:tabular-nums; }
         button.metric-pill { min-height:26px; }
@@ -1057,7 +1058,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
         <div class="bar" *ngIf="workspace.selected as task" [attr.aria-label]="i18n.text('任务状态栏', 'Task status bar')">
             <span *ngIf="cliBrand(task.executable) as cli; else terminal" class="cli-name"><img width="16" height="16" [src]="cli.source" [alt]="cli.name"><b>{{ cli.name }}</b></span>
             <ng-template #terminal><i class="icon fas fa-terminal" aria-hidden="true"></i></ng-template>
-            <strong class="ellipsis" [title]="task.name">{{ task.name }}</strong>
+            <strong class="session-title ellipsis" [title]="task.name">{{ task.name }}</strong>
             <span class="status-badge" [ngClass]="statusDisplay(task)">
                 <span class="dot" [ngClass]="statusDisplay(task)" aria-hidden="true"></span>{{ taskStatusLabel(task) }}
             </span>
