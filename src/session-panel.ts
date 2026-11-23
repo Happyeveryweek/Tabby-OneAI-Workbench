@@ -836,6 +836,7 @@ export class SessionPanelComponent implements OnChanges, OnInit, OnDestroy {
 
     reloadUsage(): void {
         this.usageCache.clear();
+        this.workspace.clearHistoryCache(this.currentProject?.distro);
         void this.load(false);
     }
 

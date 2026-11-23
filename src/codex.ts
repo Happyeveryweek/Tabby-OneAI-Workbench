@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { stat } from 'node:fs/promises';
 import { join, posix, win32 } from 'node:path';
 import { defaultCodexHome, ensureCodexHome, localReadPath } from './commands';
-import { clip, codexPrompt, findRollout, localDetails, localHistory, localPrompts, localQuota, LocalUsage, quotaFrom, sessionIdPattern } from './codex-data';
+import { clearLocalHistoryCache, clip, codexPrompt, findRollout, localDetails, localHistory, localPrompts, localQuota, LocalUsage, quotaFrom, sessionIdPattern } from './codex-data';
 import type { CodexSession, Quota, SessionDetails, SessionPrompt, UsageReport } from './codex-data';
 import type { CliSession } from './cli-history';
 import { codexRead } from './codex-rpc';
@@ -91,6 +91,7 @@ export class CodexService {
     reloadDefault(distro?: string): void { this.defaults.delete(distro ?? ''); }
 
     clearHistoryCache(distro?: string): void {
+        clearLocalHistoryCache();
         this.defaults.delete(distro ?? '');
         const prefix = `${distro ?? 'windows'}|`;
         for (const key of [...this.recent.keys()]) {
@@ -147,7 +148,7 @@ export class CodexService {
         const acceptsDirectory = cwd ? (path: string) => includeSubdirectories ? withinProject(path, cwd, scope.distro) : equalPath(path, cwd, scope.distro) : undefined;
         const [local, native] = await Promise.all([
             localHistory(scope.home, limit, acceptsDirectory),
-            this.nativeHistory(scope, includeSubdirectories ? undefined : cwd),
+            this.nativeHistory(scope, cwd, includeSubdirectories),
         ]);
         const sessions = new Map(local.map(session => [session.id.toLowerCase(), session]));
         for (const session of native) {
@@ -259,12 +260,25 @@ export class CodexService {
         return quota;
     }
 
-    private async nativeHistory(scope: CodexScope, cwd?: string): Promise<CodexSession[]> {
+    private async nativeHistory(scope: CodexScope, cwd?: string, includeSubdirectories = false): Promise<CodexSession[]> {
         try { if (!(await stat(scope.home)).isDirectory()) return []; } catch { return []; }
-        const [reply] = await codexRead<Reply>(scope.directory, scope.distro, [
-            { method: 'thread/list', params: { limit: 100, sortKey: 'updated_at', archived: false, useStateDbOnly: true, modelProviders: [], ...(cwd ? { cwd } : {}) } },
-        ]);
-        return Array.isArray(reply?.data) ? reply.data.map(asSession).filter((item): item is CodexSession => Boolean(item)) : [];
+        const base = { limit: 100, sortKey: 'updated_at', archived: false, useStateDbOnly: true, modelProviders: [] };
+        const requests = cwd && includeSubdirectories
+            ? [
+                { method: 'thread/list', params: { ...base, cwd } },
+                { method: 'thread/list', params: base },
+            ]
+            : [{ method: 'thread/list', params: { ...base, ...(cwd ? { cwd } : {}) } }];
+        const replies = await codexRead<Reply>(scope.directory, scope.distro, requests);
+        const sessions = new Map<string, CodexSession>();
+        for (const reply of replies) {
+            if (!Array.isArray(reply?.data)) continue;
+            for (const raw of reply.data) {
+                const session = asSession(raw);
+                if (session) sessions.set(session.id.toLowerCase(), session);
+            }
+        }
+        return [...sessions.values()];
     }
 
     private async nativeDetails(scope: CodexScope, threadId: string): Promise<SessionDetails> {

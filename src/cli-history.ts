@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { open, readFile, readdir, stat } from 'node:fs/promises';
 import { posix, win32 } from 'node:path';
+import { promisify } from 'node:util';
 import { localReadPath, readCliOutput } from './commands';
 import type { Project } from './commands';
 import { clip, isAbortMessage, json, jsonLines, sessionIdPattern } from './codex-data';
@@ -47,9 +49,185 @@ function messageText(content: unknown): string {
         .filter(part => part?.type === 'text' && typeof part.text === 'string').map(part => part.text).join('\n').trim() : '';
 }
 
+const execFileAsync = promisify(execFile);
+
+interface AgySummaryRow {
+    id: string;
+    title: string;
+    preview: string;
+    stepCount: number;
+    updatedAt: number;
+    workspaceUris: string[];
+    parentId?: string;
+    nestingDepth?: number;
+}
+
+interface NodeSqliteModule {
+    DatabaseSync: new (path: string, options?: { readOnly?: boolean; timeout?: number }) => {
+        prepare(sql: string): { all(): Record<string, unknown>[] };
+        close(): void;
+    };
+}
+
+let cachedNodeSqlite: NodeSqliteModule | null | undefined;
+
+function getNodeSqlite(): NodeSqliteModule | null {
+    if (cachedNodeSqlite !== undefined) return cachedNodeSqlite;
+    try {
+        const mod = require('node:sqlite') as Partial<NodeSqliteModule> | undefined;
+        cachedNodeSqlite = typeof mod?.DatabaseSync === 'function' ? (mod as NodeSqliteModule) : null;
+    } catch {
+        cachedNodeSqlite = null;
+    }
+    return cachedNodeSqlite;
+}
+
+const agyDbOptionalColumns = ['title', 'preview', 'step_count', 'last_modified_time', 'workspace_uris', 'parent_conversation_id', 'nesting_depth'] as const;
+
+const agyNodeSqliteScript = `
+const { DatabaseSync } = require('node:sqlite');
+const db = new DatabaseSync(process.argv[1], { readOnly: true, timeout: 1500 });
+try {
+    const cols = new Set(db.prepare('PRAGMA table_info(conversation_summaries)').all().map(r => String(r.name || '')));
+    if (!cols.has('conversation_id')) { process.stdout.write('[]'); return; }
+    const wanted = ['conversation_id', 'title', 'preview', 'step_count', 'last_modified_time', 'workspace_uris', 'parent_conversation_id', 'nesting_depth'].filter(c => cols.has(c));
+    const rows = db.prepare('SELECT ' + wanted.join(', ') + ' FROM conversation_summaries').all();
+    process.stdout.write(JSON.stringify(rows));
+} finally { db.close(); }
+`;
+
+const agyPythonSqliteScript = `
+import json, sqlite3, sys
+path = sys.argv[1]
+def query(uri):
+    con = sqlite3.connect(uri, uri=True, timeout=2.0)
+    try:
+        cols = {row[1] for row in con.execute('PRAGMA table_info(conversation_summaries)').fetchall()}
+        if 'conversation_id' not in cols:
+            return []
+        wanted = [c for c in ('conversation_id', 'title', 'preview', 'step_count', 'last_modified_time', 'workspace_uris', 'parent_conversation_id', 'nesting_depth') if c in cols]
+        rows = con.execute('SELECT ' + ', '.join(wanted) + ' FROM conversation_summaries').fetchall()
+        return [dict(zip(wanted, row)) for row in rows]
+    finally:
+        con.close()
+try:
+    data = query(f'file:{path}?mode=ro')
+except sqlite3.OperationalError:
+    data = query(f'file:{path}?mode=ro&immutable=1')
+sys.stdout.write(json.dumps(data))
+`;
+
+function parseAgyWorkspaceUris(value: unknown): string[] {
+    if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
+    if (typeof value !== 'string' || !value.trim()) return [];
+    try {
+        const parsed: unknown = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    } catch {
+        return [];
+    }
+}
+
+function normalizeAgyDbRows(rawRows: unknown): AgySummaryRow[] {
+    if (!Array.isArray(rawRows)) return [];
+    const results: AgySummaryRow[] = [];
+    for (const raw of rawRows) {
+        if (!raw || typeof raw !== 'object') continue;
+        const row = raw as Record<string, unknown>;
+        const id = typeof row.conversation_id === 'string' ? row.conversation_id : '';
+        if (!isId(id)) continue;
+        const stepCount = typeof row.step_count === 'number' && Number.isFinite(row.step_count) ? row.step_count : 0;
+        const nestingDepth = typeof row.nesting_depth === 'number' && Number.isFinite(row.nesting_depth) ? row.nesting_depth : 0;
+        const parentId = typeof row.parent_conversation_id === 'string' ? row.parent_conversation_id.trim() : '';
+        results.push({
+            id,
+            title: clip(row.title),
+            preview: clip(row.preview),
+            stepCount,
+            updatedAt: when(row.last_modified_time) ?? 0,
+            workspaceUris: parseAgyWorkspaceUris(row.workspace_uris),
+            parentId: parentId || undefined,
+            nestingDepth,
+        });
+    }
+    return results;
+}
+
+function queryAgyDbInProcess(dbFile: string): AgySummaryRow[] | undefined {
+    const sqlite = getNodeSqlite();
+    if (!sqlite) return undefined;
+    try {
+        const db = new sqlite.DatabaseSync(dbFile, { readOnly: true, timeout: 1500 });
+        try {
+            const cols = new Set(db.prepare('PRAGMA table_info(conversation_summaries)').all().map(r => String(r.name ?? '')));
+            if (!cols.has('conversation_id')) return [];
+            const wanted = ['conversation_id', ...agyDbOptionalColumns.filter(col => cols.has(col))];
+            const rows = db.prepare(`SELECT ${wanted.join(', ')} FROM conversation_summaries`).all();
+            return normalizeAgyDbRows(rows);
+        } finally {
+            db.close();
+        }
+    } catch {
+        return undefined;
+    }
+}
+
+async function queryAgyDbSubprocess(dbPath: string, distro?: string): Promise<AgySummaryRow[] | undefined> {
+    const options = { timeout: 8000, windowsHide: true, maxBuffer: 16 * 1024 * 1024 };
+    const parseStdout = (stdout: string): AgySummaryRow[] | undefined => {
+        const start = stdout.indexOf('[');
+        if (start < 0) return undefined;
+        try { return normalizeAgyDbRows(JSON.parse(stdout.slice(start))); } catch { return undefined; }
+    };
+    if (distro) {
+        try {
+            const { stdout } = await execFileAsync(
+                'wsl.exe',
+                ['--distribution', distro, '--cd', '/', '--exec', 'python3', '-c', agyPythonSqliteScript, dbPath],
+                options,
+            );
+            const parsed = parseStdout(stdout);
+            if (parsed !== undefined) return parsed;
+        } catch { /* Fall back to WSL node:sqlite when python3 is unavailable. */ }
+        try {
+            const { stdout } = await execFileAsync(
+                'wsl.exe',
+                ['--distribution', distro, '--cd', '/', '--exec', 'node', '--no-warnings', '-e', agyNodeSqliteScript, dbPath],
+                options,
+            );
+            const parsed = parseStdout(stdout);
+            if (parsed !== undefined) return parsed;
+        } catch {
+            return undefined;
+        }
+        return undefined;
+    }
+    try {
+        const { stdout } = await execFileAsync('node', ['--no-warnings', '-e', agyNodeSqliteScript, dbPath], options);
+        const parsed = parseStdout(stdout);
+        if (parsed !== undefined) return parsed;
+    } catch { /* Fall back to Windows python sqlite3 if system node lacks node:sqlite. */ }
+    for (const [cmd, prefix] of [['python', ['-c']], ['py', ['-3', '-c']]] as const) {
+        try {
+            const { stdout } = await execFileAsync(cmd, [...prefix, agyPythonSqliteScript, dbPath], options);
+            const parsed = parseStdout(stdout);
+            if (parsed !== undefined) return parsed;
+        } catch { /* Try next fallback. */ }
+    }
+    return undefined;
+}
+
 function when(value: unknown): number | undefined {
-    const time = typeof value === 'number' ? value * (value < 1e11 ? 1000 : 1) : typeof value === 'string' ? Date.parse(value) : NaN;
-    return Number.isFinite(time) ? time : undefined;
+    if (typeof value === 'number') {
+        const time = value * (value < 1e11 ? 1000 : 1);
+        return Number.isFinite(time) && time > 0 ? time : undefined;
+    }
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    if (!trimmed || /^0001-01-01\b/.test(trimmed)) return undefined;
+    const normalized = trimmed.replace(/^(\d{4}-\d{2}-\d{2})\s+/, '$1T');
+    const time = Date.parse(normalized);
+    return Number.isFinite(time) && time > 0 ? time : undefined;
 }
 
 function pathFromWorkspace(value: unknown, distro?: string): string {
@@ -84,12 +262,15 @@ export class CliHistory {
     private readonly usageCache = new Map<string, { mtime: number; size: number; entries: UsageEntry[]; detail: SessionDetails }>();
     private readonly sessionFileCache = new Map<string, { mtime: number; session: CliSession | null }>();
     private readonly agyHistoryCache = new Map<string, { mtime: number; size: number; items: Map<string, { cwd: string; title: string; updatedAt: number }> }>();
+    private readonly agyDbCache = new Map<string, { sig: string; rows: AgySummaryRow[] }>();
+    private readonly agyDbPending = new Map<string, Promise<AgySummaryRow[]>>();
 
     constructor(private readonly directories = new CliDirectories()) {}
 
     clearCache(): void {
         this.sessionFileCache.clear();
         this.agyHistoryCache.clear();
+        this.agyDbCache.clear();
     }
 
     async list(project: Project, limit: number, available: (name: string) => Promise<boolean>): Promise<CliSession[]> {
@@ -359,21 +540,110 @@ export class CliHistory {
         return results;
     }
 
+    private async readAgySummariesDb(home: string, readable: string, distro?: string): Promise<AgySummaryRow[]> {
+        const dbFile = win32.join(readable, 'conversation_summaries.db');
+        const walFile = win32.join(readable, 'conversation_summaries.db-wal');
+        const [dbInfo, walInfo] = await Promise.all([
+            stat(dbFile).catch(() => undefined),
+            stat(walFile).catch(() => undefined),
+        ]);
+        if (!dbInfo) return [];
+        const sig = `${dbInfo.mtimeMs}:${dbInfo.size}|${walInfo?.mtimeMs ?? 0}:${walInfo?.size ?? 0}`;
+        const cached = this.agyDbCache.get(dbFile);
+        if (cached && cached.sig === sig) return cached.rows;
+        const pendingKey = `${dbFile}|${sig}`;
+        let pending = this.agyDbPending.get(pendingKey);
+        if (!pending) {
+            pending = (async () => {
+                if (!distro) {
+                    const direct = queryAgyDbInProcess(dbFile);
+                    if (direct !== undefined) return direct;
+                }
+                const nativeDbPath = distro ? posix.join(home, 'conversation_summaries.db') : dbFile;
+                return queryAgyDbSubprocess(nativeDbPath, distro);
+            })().then(rows => {
+                if (rows !== undefined) {
+                    this.agyDbCache.set(dbFile, { sig, rows });
+                    return rows;
+                }
+                return [];
+            }).finally(() => {
+                this.agyDbPending.delete(pendingKey);
+            });
+            this.agyDbPending.set(pendingKey, pending);
+        }
+        return pending;
+    }
+
     private async agy(project: Project, home: string): Promise<CliSession[]> {
         const readable = await localReadPath(home, project.distro);
-        const meta = await readJson(win32.join(readable, 'cache', 'conversation_metadata.json'));
+        const [meta, dbRows] = await Promise.all([
+            readJson(win32.join(readable, 'cache', 'conversation_metadata.json')),
+            this.readAgySummariesDb(home, readable, project.distro).catch(() => [] as AgySummaryRow[]),
+        ]);
         const file = win32.join(readable, 'history.jsonl');
         const transcriptFor = (id: string) => win32.join(readable, 'brain', id, '.system_generated', 'logs', 'transcript.jsonl');
         const sessions = new Map<string, CliSession>();
+        const blockedIds = new Set<string>();
+        const knownOtherWorkspaceIds = new Set<string>();
         for (const [id, entry] of Object.entries(meta?.conversations ?? {}) as [string, any][]) {
             const summary = entry?.summary;
-            if (!isId(id) || !summary || entry.is_internal || summary.Internal || summary.Cloud) continue;
+            if (!isId(id) || !summary) continue;
+            if (entry.is_internal || summary.Internal || summary.Cloud) {
+                blockedIds.add(id);
+                continue;
+            }
+            const title = clip(summary.Title) || clip(summary.Preview);
+            if (!title && typeof summary.NumSteps === 'number' && summary.NumSteps <= 0) {
+                blockedIds.add(id);
+                continue;
+            }
             const cwd = (Array.isArray(summary.WorkspaceURIs) ? summary.WorkspaceURIs : []).map((uri: unknown) => pathFromWorkspace(uri, project.distro))
                 .find((candidate: string) => withinProject(candidate, project.directory, project.distro));
-            if (!cwd) continue;
-            sessions.set(id, { id, cwd, title: clip(summary.Title) || clip(summary.Preview) || 'Antigravity 会话',
+            if (!cwd) {
+                knownOtherWorkspaceIds.add(id);
+                continue;
+            }
+            sessions.set(id, { id, cwd, title: title || 'Antigravity 会话',
                 executable: 'agy', args: ['--conversation', id], promptFile: file, wireFile: transcriptFor(id),
-                updatedAt: when(summary.UpdatedAt ?? entry.last_modified_time) ?? 0 });
+                updatedAt: when(summary.UpdatedAt) ?? when(entry.last_modified_time) ?? 0 });
+        }
+        for (const row of dbRows) {
+            if (blockedIds.has(row.id)) continue;
+            if (row.parentId || (row.nestingDepth ?? 0) > 0) {
+                blockedIds.add(row.id);
+                sessions.delete(row.id);
+                continue;
+            }
+            const rowTitle = row.title || row.preview;
+            if (!rowTitle && row.stepCount <= 0) {
+                blockedIds.add(row.id);
+                continue;
+            }
+            const existing = sessions.get(row.id);
+            if (existing) {
+                existing.updatedAt = Math.max(existing.updatedAt, row.updatedAt);
+                if (rowTitle && (!existing.title || existing.title === 'Antigravity 会话' || existing.title.startsWith('/'))) {
+                    existing.title = rowTitle;
+                }
+                continue;
+            }
+            const cwd = row.workspaceUris.map(uri => pathFromWorkspace(uri, project.distro))
+                .find(candidate => withinProject(candidate, project.directory, project.distro));
+            if (!cwd) {
+                knownOtherWorkspaceIds.add(row.id);
+                continue;
+            }
+            sessions.set(row.id, {
+                id: row.id,
+                cwd,
+                title: rowTitle || 'Antigravity 会话',
+                executable: 'agy',
+                args: ['--conversation', row.id],
+                promptFile: file,
+                wireFile: transcriptFor(row.id),
+                updatedAt: row.updatedAt,
+            });
         }
         const info = await stat(file).catch(() => undefined);
         let historyMap = info ? this.agyHistoryCache.get(file) : undefined;
@@ -405,7 +675,7 @@ export class CliHistory {
                 }
                 continue;
             }
-            if (meta?.conversations?.[id]) continue;
+            if (meta?.conversations?.[id] || blockedIds.has(id) || knownOtherWorkspaceIds.has(id)) continue;
             if (!withinProject(item.cwd, project.directory, project.distro) || !item.title) continue;
             sessions.set(id, { id, cwd: item.cwd, title: item.title, executable: 'agy', args: ['--conversation', id], promptFile: file,
                 wireFile: transcriptFor(id), updatedAt: item.updatedAt });

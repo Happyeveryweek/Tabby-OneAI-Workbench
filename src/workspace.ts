@@ -10,7 +10,7 @@ import type { Command, Project } from './commands';
 import { CodexService, codexTerminalTitle, codexTitleOption, defaultAccount, equalPath, isCodex, withinProject } from './codex';
 import type { CodexActivity, CodexScope, HistoryEntry } from './codex';
 import type { SessionDetails } from './codex-data';
-import { isAbortMessage } from './codex-data';
+import { isAbortMessage, sessionIdPattern } from './codex-data';
 import { CliHistory } from './cli-history';
 import type { CliSession } from './cli-history';
 import { extractMeterSettingsArg, prepareAgyMeter, recoverAgyMeter, watchAgyMeterFile } from './agy-meter';
@@ -523,6 +523,91 @@ function pruneStoredTasks(records: TaskRecord[]): TaskRecord[] {
     return kept;
 }
 
+export interface RestoredSessionInfo {
+    args: string[];
+    sessionId?: string;
+    codexHome?: string;
+    dataDirectory?: string;
+}
+
+const restoredCliIdPattern = /^[a-z0-9][a-z0-9_-]{5,100}$/i;
+
+function parsePowerShellQuotedTokens(script: string): string[] {
+    const tokens: string[] = [];
+    const regex = /'((?:[^']|'')*)'/g;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(script)) !== null) {
+        tokens.push(match[1].replace(/''/g, "'"));
+    }
+    return tokens;
+}
+
+export function extractRestoredSessionInfo(
+    executable: string,
+    options?: { args?: string[]; env?: Record<string, string> },
+): RestoredSessionInfo {
+    const rawArgs = Array.isArray(options?.args) ? options!.args : [];
+    const envMap: Record<string, string> = { ...(options?.env ?? {}) };
+    let tokens: string[] = [];
+    const encIdx = rawArgs.findIndex(item => item.toLowerCase() === '-encodedcommand');
+    if (encIdx >= 0 && typeof rawArgs[encIdx + 1] === 'string') {
+        try {
+            const script = Buffer.from(rawArgs[encIdx + 1], 'base64').toString('utf16le');
+            tokens = parsePowerShellQuotedTokens(script);
+        } catch { /* Ignore malformed encoded command. */ }
+    } else {
+        const sepIdx = rawArgs.indexOf('--');
+        tokens = sepIdx >= 0 ? rawArgs.slice(sepIdx + 1) : [...rawArgs];
+        const envIdx = tokens.indexOf('env');
+        if (envIdx === 0 || envIdx === 1) {
+            let cursor = envIdx + 1;
+            while (cursor < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[cursor])) {
+                const eq = tokens[cursor].indexOf('=');
+                envMap[tokens[cursor].slice(0, eq)] = tokens[cursor].slice(eq + 1);
+                cursor++;
+            }
+            tokens = tokens.slice(cursor);
+        }
+    }
+    const brandExec = isCodex(executable) ? 'codex' : (cliBrand(executable)?.executable ?? executable);
+    const cli = configurableCli(executable);
+    const dataDirectory = cli ? (envMap[directoryVariables[cli]] || (cli === 'kimi' ? envMap.KIMI_SHARE_DIR : undefined)) : undefined;
+    const codexHome = envMap.CODEX_HOME || undefined;
+
+    if (brandExec === 'codex') {
+        for (let i = 0; i < tokens.length - 1; i++) {
+            if (tokens[i] === 'resume' && sessionIdPattern.test(tokens[i + 1])) {
+                return { args: [], sessionId: tokens[i + 1], codexHome, dataDirectory };
+            }
+        }
+        return { args: [], codexHome, dataDirectory };
+    }
+
+    const flagFor = (exec: string): string | undefined =>
+        exec === 'agy' ? '--conversation'
+            : (exec === 'claude' || exec === 'grok' || exec === 'copilot') ? '--resume'
+            : (exec === 'opencode' || exec === 'kimi' || exec === 'pi') ? '--session'
+            : undefined;
+    const flag = flagFor(brandExec);
+    if (flag) {
+        for (let i = 0; i < tokens.length; i++) {
+            const token = tokens[i];
+            let value: string | undefined;
+            if (token === flag && i + 1 < tokens.length) value = tokens[i + 1];
+            else if (token.startsWith(flag + '=')) value = token.slice(flag.length + 1);
+            if (!value) continue;
+            if (brandExec === 'pi') {
+                const uuid = value.match(/([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})(?=\.jsonl$)/i)?.[1];
+                return { args: [flag, value], sessionId: uuid, codexHome, dataDirectory };
+            }
+            if (restoredCliIdPattern.test(value)) {
+                return { args: [flag, value], sessionId: value, codexHome, dataDirectory };
+            }
+        }
+    }
+    return { args: [], codexHome, dataDirectory };
+}
+
 const sessionOpenTimeoutMessage = 'Tabby 未报告终端已启动。请检查终端输出。';
 
 @Injectable()
@@ -560,6 +645,7 @@ export class WorkspaceService implements OnDestroy {
     private readonly agyMeterActivities = new Map<string, CodexActivity>();
     private readonly piLiveDetail = new Map<string, SessionDetails>();
     private readonly detailPending = new Set<string>();
+    private readonly detailForceQueued = new Set<string>();
     private readonly detailTime = new Map<string, number>();
     private readonly projectHistory = new Map<string, HistoryEntry[]>();
     private readonly allProjectHistory = new Map<string, HistoryEntry[]>();
@@ -733,10 +819,14 @@ export class WorkspaceService implements OnDestroy {
         for (const project of this.projects) void this.loadRecentHistory(project);
     }
 
-    async refreshProjectHistory(project: Project): Promise<void> {
+    clearHistoryCache(distro?: string): void {
         this.cliHistory.clearCache();
-        this.codex.clearHistoryCache(project.distro);
-        this.cliDirectories.reload(project.distro);
+        this.codex.clearHistoryCache(distro);
+        this.cliDirectories.reload(distro);
+    }
+
+    async refreshProjectHistory(project: Project): Promise<void> {
+        this.clearHistoryCache(project.distro);
         await Promise.all([
             this.loadRecentHistory(project),
             this.refreshBranch(project),
@@ -745,8 +835,7 @@ export class WorkspaceService implements OnDestroy {
     }
 
     async refreshRuntimeHistory(distro?: string): Promise<void> {
-        this.codex.reloadDefault(distro);
-        this.cliDirectories.reload(distro);
+        this.clearHistoryCache(distro);
         await Promise.all(this.projects.filter(project => project.distro === distro).map(project => this.loadRecentHistory(project)));
     }
 
@@ -763,12 +852,15 @@ export class WorkspaceService implements OnDestroy {
                 if (this.isHistoryRemoved(entry)) return false;
                 const bound = this.historyTask(entry, project.id);
                 if (bound) {
-                    if (entry.title && !this.isDefaultNameFor(bound.executable, entry.title) && this.isDefaultTaskName(bound)) {
+                    const prevTitle = bound.cliSession?.title;
+                    const canAutoRename = this.isDefaultTaskName(bound) || (Boolean(prevTitle) && bound.name === prevTitle);
+                    if (entry.title && entry.title !== bound.name && !this.isDefaultNameFor(bound.executable, entry.title) && canAutoRename) {
                         this.zone.run(() => {
                             bound.name = entry.title;
                             if (bound.cliSession) bound.cliSession.title = entry.title;
                             this.bindings.get(bound.id)?.pane.setTitle?.(`${bound.name} · ${project.name}`);
                             this.saveTask(bound);
+                            void this.syncLivePaneProfile(bound, project);
                         });
                     }
                     return true;
@@ -1289,15 +1381,40 @@ export class WorkspaceService implements OnDestroy {
             ? profileName.slice(0, -suffix.length)
             : (profileName || matchedCli?.name || executable);
         const directory = rawDir && !equalPath(rawDir, project.directory, project.distro) ? rawDir : undefined;
+        const restored = extractRestoredSessionInfo(executable, options);
+        const now = Date.now();
+        let codex: TaskRecord['codex'];
+        let cliSession: CliSession | undefined;
+        if (isCodex(executable)) {
+            const matchedAccount = restored.codexHome
+                ? this.codex.accounts.find(item => item.distro === project.distro && equalPath(item.directory, restored.codexHome!, project.distro))
+                : undefined;
+            codex = { accountId: matchedAccount?.id ?? defaultAccount, sessionId: restored.sessionId };
+        } else if (restored.sessionId && restored.args.length
+            && (executable === 'agy' || executable === 'pi' || executable === 'opencode' || executable === 'kimi'
+                || executable === 'claude' || executable === 'grok' || executable === 'copilot')) {
+            cliSession = {
+                id: restored.sessionId,
+                cwd: directory ?? project.directory,
+                title: name,
+                updatedAt: now,
+                executable,
+                args: [...restored.args],
+                distro: project.distro,
+                dataDirectory: restored.dataDirectory,
+            };
+        }
         return this.newTask({
             id: taskId,
             projectId: project.id,
             name,
             executable,
-            args: [],
-            codex: isCodex(executable) ? { accountId: defaultAccount } : undefined,
+            args: restored.args,
+            codex,
+            cliSession,
             directory,
-            lastActiveAt: Date.now(),
+            dataDirectory: restored.dataDirectory,
+            lastActiveAt: now,
         });
     }
 
@@ -1989,7 +2106,9 @@ export class WorkspaceService implements OnDestroy {
     }
 
     private async syncCliTaskSession(task: Task, project: Project, executable: CliSession['executable']): Promise<void> {
-        const sessions = await this.cliHistory.listForCli(project, executable, 15);
+        const liveAgyId = executable === 'agy' ? this.agyLiveSessionIds.get(task.id) : undefined;
+        const targetId = liveAgyId ?? task.cliSession?.id;
+        const sessions = await this.cliHistory.listForCli(project, executable, targetId ? 200 : 15);
         if (!sessions.length) return;
         const attached = new Set(this.tasksFor(project)
             .filter(other => other.id !== task.id)
@@ -1997,7 +2116,6 @@ export class WorkspaceService implements OnDestroy {
             .filter((key): key is string => Boolean(key)));
         const keyOf = (item: CliSession) => historyId(project.distro, item.directoryId ?? defaultAccount, item.id, item.executable);
 
-        const liveAgyId = executable === 'agy' ? this.agyLiveSessionIds.get(task.id) : undefined;
         if (!task.cliSession || (liveAgyId && task.cliSession.id !== liveAgyId)) {
             if (task.status !== 'running') return;
             let matched: CliSession | undefined;
@@ -2037,7 +2155,14 @@ export class WorkspaceService implements OnDestroy {
         if (!fresh) return;
         this.zone.run(() => {
             const prevUpdated = task.cliSession?.updatedAt ?? 0;
-            const renamed = Boolean(fresh.title && !this.isDefaultNameFor(task.executable, fresh.title) && this.isDefaultTaskName(task));
+            const prevTitle = task.cliSession?.title;
+            const canAutoRename = this.isDefaultTaskName(task) || (Boolean(prevTitle) && task.name === prevTitle);
+            const renamed = Boolean(
+                fresh.title
+                && fresh.title !== task.name
+                && !this.isDefaultNameFor(task.executable, fresh.title)
+                && canAutoRename,
+            );
             task.cliSession = { ...task.cliSession!, ...fresh };
             if (renamed) {
                 task.name = fresh.title;
@@ -2088,6 +2213,7 @@ export class WorkspaceService implements OnDestroy {
         this.claudeTranscripts.delete(task.id);
         this.agyMeterActivities.delete(task.id);
         this.piLiveDetail.delete(task.id);
+        this.detailForceQueued.delete(task.id);
         this.detailTime.delete(task.id);
     }
 
@@ -2104,13 +2230,19 @@ export class WorkspaceService implements OnDestroy {
             ? executable
             : undefined;
         const project = this.projectFor(task);
-        if ((!codex && !extExec) || !project || this.detailPending.has(task.id)) return;
+        if ((!codex && !extExec) || !project) return;
+        if (this.detailPending.has(task.id)) {
+            if (force) this.detailForceQueued.add(task.id);
+            return;
+        }
         if (!force && Date.now() - (this.detailTime.get(task.id) ?? 0) < 4000) return;
         this.detailTime.set(task.id, Date.now());
         this.detailPending.add(task.id);
         try {
             if (extExec) {
-                if (!task.cliSession || this.isDefaultTaskName(task) || force) {
+                const agyLiveId = extExec === 'agy' ? this.agyLiveSessionIds.get(task.id) : undefined;
+                const agySwitched = Boolean(agyLiveId && agyLiveId !== task.cliSession?.id);
+                if (!task.cliSession || this.isDefaultTaskName(task) || force || agySwitched) {
                     await this.syncCliTaskSession(task, project, extExec);
                 }
                 const cli = task.cliSession;
@@ -2206,7 +2338,12 @@ export class WorkspaceService implements OnDestroy {
                 this.treeVersion++;
             });
         } catch { /* Account and session metadata can be temporarily unavailable. */ }
-        finally { this.detailPending.delete(task.id); }
+        finally {
+            this.detailPending.delete(task.id);
+            if (this.detailForceQueued.delete(task.id)) {
+                void this.updateDetails(task, true);
+            }
+        }
     }
 
     private async bindClaudeTranscript(task: Task, project: Project, id: string, transcript: string, dataDirectory?: string): Promise<void> {

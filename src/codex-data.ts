@@ -171,29 +171,47 @@ async function titlesAt(home: string): Promise<Map<string, string>> {
     return result;
 }
 
-const rolloutMetaCache = new Map<string, { id: string; cwd: string; firstPrompt?: string; mtimeMs: number } | null>();
+interface RolloutMetaCacheEntry {
+    mtimeMs: number;
+    meta: { id: string; cwd: string; firstPrompt?: string } | null;
+}
+
+const rolloutMetaCache = new Map<string, RolloutMetaCacheEntry>();
+
+export function clearLocalHistoryCache(): void {
+    rolloutMetaCache.clear();
+}
 
 export async function localHistory(home: string, limit = 200, acceptsDirectory?: (cwd: string) => boolean): Promise<CodexSession[]> {
-    const maxFiles = Math.min(Math.max(limit * 3, 36), 96);
+    const maxFiles = acceptsDirectory
+        ? Math.min(Math.max(limit * 6, 120), 320)
+        : Math.min(Math.max(limit * 3, 36), 96);
     const [files, titles] = await Promise.all([filesIn(join(home, 'sessions'), 4, maxFiles), titlesAt(home)]);
     const sessions = new Map<string, CodexSession>();
     let scanned = 0;
     for (const file of files) {
         if (file.endsWith('.zst')) continue;
         const cached = rolloutMetaCache.get(file);
-        if (cached === null) continue;
-        if (cached && acceptsDirectory && !acceptsDirectory(cached.cwd)) continue;
+        if (cached?.meta && acceptsDirectory && !acceptsDirectory(cached.meta.cwd)) continue;
         if (++scanned % 8 === 0) await new Promise(resolve => setTimeout(resolve, 0));
         try {
-            let metaEntry = cached;
-            if (!metaEntry) {
+            const info = await stat(file);
+            let metaEntry: { id: string; cwd: string; firstPrompt?: string; mtimeMs: number } | undefined;
+            if (cached && cached.mtimeMs === info.mtimeMs) {
+                if (!cached.meta) continue;
+                metaEntry = { ...cached.meta, mtimeMs: info.mtimeMs };
+            } else if (cached?.meta && cached.meta.firstPrompt) {
+                cached.mtimeMs = info.mtimeMs;
+                metaEntry = { ...cached.meta, mtimeMs: info.mtimeMs };
+            } else {
                 const rawLines = await readSlice(file, 24 * 1024);
                 const first = json(rawLines[0] ?? '');
                 const meta = (first?.type === 'session_meta' ? first : rawLines.slice(0, 6).map(json).find(line => line?.type === 'session_meta'))?.payload;
                 const id = string(meta?.id);
                 const cwd = string(meta?.cwd);
                 if (!sessionIdPattern.test(id) || !cwd || (meta.source && typeof meta.source !== 'string')) {
-                    rolloutMetaCache.set(file, null);
+                    if (rolloutMetaCache.size >= 1024) rolloutMetaCache.delete(rolloutMetaCache.keys().next().value!);
+                    rolloutMetaCache.set(file, { mtimeMs: info.mtimeMs, meta: null });
                     continue;
                 }
                 let firstPrompt: string | undefined;
@@ -202,13 +220,10 @@ export async function localHistory(home: string, limit = 200, acceptsDirectory?:
                     const text = parsed && userText(parsed);
                     if (text) { firstPrompt = clip(text); break; }
                 }
-                const { mtimeMs } = await stat(file);
-                metaEntry = { id, cwd, firstPrompt, mtimeMs };
-                if (rolloutMetaCache.size >= 512) rolloutMetaCache.delete(rolloutMetaCache.keys().next().value!);
-                rolloutMetaCache.set(file, metaEntry);
-            } else {
-                const info = await stat(file).catch(() => undefined);
-                if (info) metaEntry.mtimeMs = info.mtimeMs;
+                const stored = { id, cwd, firstPrompt };
+                if (rolloutMetaCache.size >= 1024) rolloutMetaCache.delete(rolloutMetaCache.keys().next().value!);
+                rolloutMetaCache.set(file, { mtimeMs: info.mtimeMs, meta: stored });
+                metaEntry = { ...stored, mtimeMs: info.mtimeMs };
             }
             if (acceptsDirectory && !acceptsDirectory(metaEntry.cwd)) continue;
             const title = titles.get(metaEntry.id) || metaEntry.firstPrompt || metaEntry.cwd.split(/[\\/]/).filter(Boolean).pop() || 'Codex 会话';

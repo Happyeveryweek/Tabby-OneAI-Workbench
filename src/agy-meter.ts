@@ -100,9 +100,10 @@ export async function recoverAgyMeter(
     if (!commandText) return;
     if (!commandText.includes('agy-status-bridge') && !commandText.includes('statusline.cmd')) return;
 
-    const cmdMatch = commandText.match(/([a-zA-Z]:[\\/][^\s"']+?[\\/]tabby-oneai-(?:agy-[^\\/\s"']+|meters[\\/][^\\/\s"']+)[\\/]statusline\.cmd)/i);
-    if (cmdMatch) {
-        const cmdFile = cmdMatch[1].replace(/\//g, '\\');
+    const cmdMatch = commandText.match(/(?:"([a-zA-Z]:[\\/][^"]+?[\\/]tabby-oneai-(?:agy-[^\\/"]+|meters[\\/][^\\/"]+)[\\/]statusline\.cmd)"|([a-zA-Z]:[\\/][^\s"']+?[\\/]tabby-oneai-(?:agy-[^\\/\s"']+|meters[\\/][^\\/\s"']+)[\\/]statusline\.cmd))/i);
+    const rawCmdFile = cmdMatch?.[1] ?? cmdMatch?.[2];
+    if (rawCmdFile) {
+        const cmdFile = rawCmdFile.replace(/\//g, '\\');
         const dir = win32.dirname(cmdFile);
         const resultFile = win32.join(dir, 'status.json');
         if (!await stat(cmdFile).catch(() => null)) {
@@ -164,7 +165,8 @@ export async function prepareAgyMeter(project: Project, task: Command, source: '
             const cmdArgs = ['node', `"${helper}"`, `"${destination}"`];
             if (previous) cmdArgs.push(Buffer.from(previous).toString('base64'));
             await writeFile(launcher, `@echo off\r\nsetlocal DisableDelayedExpansion\r\n${cmdArgs.join(' ')}\r\n`, 'utf8');
-            commandString = launcher.replace(/\\/g, '/');
+            const normalizedLauncher = launcher.replace(/\\/g, '/');
+            commandString = /\s/.test(normalizedLauncher) ? `"${normalizedLauncher}"` : normalizedLauncher;
         } else {
             const quote = (s: string) => project.distro ? "'" + s.replace(/'/g, "'\\''") + "'" : '"' + s + '"';
             const args = ['node', quote(helper), quote(destination)];

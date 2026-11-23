@@ -374,7 +374,7 @@ interface RemovedProjectGroup {
                                 [attr.aria-label]="i18n.text('搜索项目历史会话', 'Search project session history')"
                                 [value]="searchQuery" (input)="onSearchQueryInput($any($event.target).value)">
                         </div>
-                        <button type="button" class="ui-btn-primary" [disabled]="searchLoading" (click)="loadProjectSearch()">
+                        <button type="button" class="ui-btn-primary" [disabled]="searchLoading" (click)="loadProjectSearch(undefined, true)">
                             {{ searchLoading ? i18n.text('加载中…', 'Loading…') : i18n.text('刷新', 'Refresh') }}
                         </button>
                     </div>
@@ -1393,9 +1393,10 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
         this.rebuildSearchView();
     }
 
-    async loadProjectSearch(targetLoadId?: number): Promise<void> {
+    async loadProjectSearch(targetLoadId?: number, forceRefresh = false): Promise<void> {
         const project = this.searchProject;
         if (!project) return;
+        if (forceRefresh) this.workspace.clearHistoryCache(project.distro);
         const loadId = targetLoadId ?? ++this.searchLoadId;
         this.searchLoading = true;
         this.error = '';
@@ -1405,7 +1406,7 @@ export class WorkbenchOverlay implements OnInit, OnDestroy, DoCheck {
             const timeout = new Promise<never>((_, reject) => {
                 timer = setTimeout(() => reject(new Error('timeout')), 15000);
             });
-            const rawEntries = await Promise.race([this.workspace.projectSessions(project, 30), timeout])
+            const rawEntries = await Promise.race([this.workspace.projectSessions(project, 200), timeout])
                 .finally(() => { if (timer) clearTimeout(timer); });
             if (loadId !== this.searchLoadId) return;
             const entries = rawEntries.filter(entry => !this.workspace.isHistoryRemoved(entry));

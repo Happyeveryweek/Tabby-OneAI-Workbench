@@ -9,7 +9,7 @@ import { supportedCli } from './cli-icons';
 import { WorkbenchI18n } from './i18n';
 import { WorkspaceService } from './workspace';
 
-const variables = { codex: 'CODEX_HOME', ...directoryVariables, agy: '', opencode: '' } as const;
+const variables = { codex: 'CODEX_HOME', ...directoryVariables, agy: '', grok: '', opencode: '' } as const;
 type ListedCli = keyof typeof variables;
 interface DirectoryRow { id: string; name: string; directory: string; exists?: boolean; codex?: CodexScope; cli?: CliDirectory; }
 
@@ -257,6 +257,7 @@ export class CliDirectoriesPanel implements OnInit, OnDestroy {
         this.distros = existing;
         void distributions().then(items => {
             this.distros = [...new Set([...items, ...existing])];
+            this.cdr.markForCheck();
         });
         void this.load();
     }
@@ -278,7 +279,7 @@ export class CliDirectoriesPanel implements OnInit, OnDestroy {
     get preferredId(): string {
         const { executable, distro } = this;
         if (executable === 'codex') return this.workspace.codex.preferred(distro);
-        if (executable === 'agy' || executable === 'opencode') return defaultDirectoryId;
+        if (executable === 'agy' || executable === 'grok' || executable === 'opencode') return defaultDirectoryId;
         return this.workspace.cliDirectories.preferred(executable, distro)?.id
             ?? (executable === 'kimi' ? this.rows[0]?.id : undefined) ?? defaultDirectoryId;
     }
@@ -328,9 +329,10 @@ export class CliDirectoriesPanel implements OnInit, OnDestroy {
                 const scopes = (await this.workspace.codex.scopes([distro])).filter(scope => scope.distro === distro);
                 rows = scopes.map(scope => ({ id: scope.id, name: scope.id === defaultAccount ? this.i18n.text('环境默认目录', 'Default environment directory') : scope.name,
                     directory: scope.directory, codex: scope }));
-            } else if (executable === 'agy' || executable === 'opencode') {
-                const directory = executable === 'agy' ? (await this.workspace.cliDirectories.homes(distro)).agy
-                    : await readCliOutput(runtimeProject(distro), { executable, args: ['debug', 'paths', 'db'] });
+            } else if (executable === 'agy' || executable === 'grok' || executable === 'opencode') {
+                const directory = executable === 'opencode'
+                    ? await readCliOutput(runtimeProject(distro), { executable, args: ['debug', 'paths', 'db'] })
+                    : (await this.workspace.cliDirectories.homes(distro))[executable];
                 rows = directory ? [{ id: defaultDirectoryId, name: executable === 'opencode' ? this.i18n.text('当前数据库', 'Current database') : this.i18n.text('环境默认目录', 'Default environment directory'), directory }] : [];
             } else {
                 rows = (await this.workspace.cliDirectories.scopes(executable, distro)).map(scope => ({ ...scope, cli: scope }));
@@ -340,13 +342,18 @@ export class CliDirectoriesPanel implements OnInit, OnDestroy {
             })));
             if (id === this.loadId) this.rows = results;
         } catch { /* An unavailable CLI does not prevent choosing another environment. */ }
-        finally { if (id === this.loadId) this.loading = false; }
+        finally {
+            if (id === this.loadId) {
+                this.loading = false;
+                this.cdr.markForCheck();
+            }
+        }
     }
 
     async saveDirectory(event: SubmitEvent, name: string, directory: string): Promise<void> {
         event.preventDefault();
         const { executable, distro } = this;
-        if (this.busy || executable === 'agy' || executable === 'opencode') return;
+        if (this.busy || executable === 'agy' || executable === 'grok' || executable === 'opencode') return;
         this.busy = true;
         this.error = this.notice = '';
         try {
