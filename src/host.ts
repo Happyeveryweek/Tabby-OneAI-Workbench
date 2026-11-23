@@ -28,6 +28,8 @@ export interface Tab {
     frontendIsReady?: boolean;
     savedState?: unknown;
     getRecoveryToken?(options?: { includeState?: boolean }): Promise<Record<string, unknown> | null>;
+    paste?(): Promise<void>;
+    sendInput?(data: string): void;
     getAllTabs?(): Tab[];
     getFocusedTab?(): Tab | null;
     focus?(tab: Tab): void;
@@ -73,6 +75,7 @@ interface Profiles {
 
 interface Platform {
     pickDirectory(): Promise<string | null>;
+    readClipboard?(): string;
     setClipboard(content: { text: string }): void;
     listFonts(): Promise<string[]>;
     openPath?(path: string): void;

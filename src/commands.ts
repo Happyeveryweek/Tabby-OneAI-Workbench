@@ -73,6 +73,7 @@ export interface Command {
     args: string[];
     codexHome?: string;
     env?: Record<string, string>;
+    wslClipBin?: string;
 }
 
 export const profilePrefix = 'tabby-oneai:';
@@ -185,8 +186,11 @@ export function commandFor(project: Project, command: Command): LocalProfile['op
     const invocation = [command.executable, ...command.args];
     const env = command.codexHome ? { ...command.env, CODEX_HOME: command.codexHome } : command.env;
     const variables = Object.entries(env ?? {}).map(([key, value]) => `${key}=${value}`);
+    const wslScript = command.wslClipBin
+        ? `${linuxPathPrefix}PATH="$1:$PATH"; export PATH; [ -n "$WAYLAND_DISPLAY" ] || export WAYLAND_DISPLAY=tabby-oneai-clip; shift; exec "$@"`
+        : `${linuxPathPrefix}exec "$@"`;
     return project.distro
-        ? { command: wsl, args: linuxArgs(project, 'bash', ['-lc', `${linuxPathPrefix}exec "$@"`, '--', ...(variables.length ? ['env', ...variables] : []), ...invocation]) }
+        ? { command: wsl, args: linuxArgs(project, 'bash', ['-lc', wslScript, '--', ...(command.wslClipBin ? [command.wslClipBin] : []), ...(variables.length ? ['env', ...variables] : []), ...invocation]) }
         : {
             command: powershell,
             args: encoded(`& ${invocation.map(quotePS).join(' ')}; exit $LASTEXITCODE`),

@@ -14,6 +14,7 @@ import { isAbortMessage } from './codex-data';
 import { CliHistory } from './cli-history';
 import type { CliSession } from './cli-history';
 import { extractMeterSettingsArg, prepareAgyMeter, recoverAgyMeter, watchAgyMeterFile } from './agy-meter';
+import { prepareAgyWslClipboard, syncAgyClipboardSnapshot } from './agy-wsl-clipboard';
 import type { AgyStatus } from './agy-status';
 import { CliDirectories, configurableCli, directoryVariables } from './cli-directories';
 import { WorkbenchI18n } from './i18n';
@@ -619,6 +620,16 @@ export class WorkspaceService implements OnDestroy {
             };
             this.subscriptions.add(() => { this.app.closeWindow = origCloseWindow; });
         }
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+            const onFocus = () => {
+                const current = this.selected;
+                if (current && current.status === 'running' && this.projectFor(current)?.distro && cliBrand(current.executable)?.executable === 'agy') {
+                    syncAgyClipboardSnapshot(this.platform);
+                }
+            };
+            window.addEventListener('focus', onFocus);
+            this.subscriptions.add(() => window.removeEventListener('focus', onFocus));
+        }
     }
 
     registerCloseConfirm(handler?: (tasks: Task[]) => Promise<boolean>): void {
@@ -1046,6 +1057,12 @@ export class WorkspaceService implements OnDestroy {
                 task.detail = undefined;
                 meter = await prepareAgyMeter(project, command, cli === 'claude' ? 'claude' : 'agy', task.id).catch(() => undefined);
                 if (meter) command = meter.command;
+                if (project.distro && brandExec === 'agy') {
+                    const clip = await prepareAgyWslClipboard(project).catch(() => undefined);
+                    if (clip) {
+                        command = { ...command, wslClipBin: clip.binDir, env: { ...command.env, TABBY_ONEAI_CLIP_DIR: clip.wslClipDir } };
+                    }
+                }
             }
             const pane = await this.profiles.openNewTabForProfile(profileFor(
                 task.id, `${task.name} · ${project.name}`, project, command, statusColors.starting,
@@ -1369,6 +1386,19 @@ export class WorkspaceService implements OnDestroy {
             };
             events.add(() => { pane.getRecoveryToken = origGetRecoveryToken; });
         }
+        const isWslAgy = Boolean(this.projectFor(task)?.distro && cliBrand(task.executable)?.executable === 'agy');
+        if (isWslAgy && typeof pane.paste === 'function') {
+            const origPaste = pane.paste.bind(pane);
+            pane.paste = async () => {
+                const text = this.platform.readClipboard?.();
+                if (!text && syncAgyClipboardSnapshot(this.platform)) {
+                    pane.sendInput?.('\x1bv');
+                    return;
+                }
+                return origPaste();
+            };
+            events.add(() => { pane.paste = origPaste; });
+        }
         if (pane.profile && pane.profile.behaviorOnSessionEnd !== 'close') {
             try { pane.profile.behaviorOnSessionEnd = 'close'; } catch { /* Ignore readonly profile proxy. */ }
         }
@@ -1454,6 +1484,9 @@ export class WorkspaceService implements OnDestroy {
                 this.zone.run(() => this.reviveTimeoutFailedTask(task));
             }
             const text = typeof data === 'string' ? data : Buffer.isBuffer(data) ? data.toString('utf8') : String(data ?? '');
+            if (isWslAgy && /\x16|\x1b[vV]|\x1b\[118;[35]u/.test(text)) {
+                syncAgyClipboardSnapshot(this.platform);
+            }
             if (/[\r\n]|\x1bOM|\x1b\[13;[0-9;]*u/.test(text)) {
                 this.turnArmed.add(task.id);
                 if (screenHasSelectedUpdateNow(pane.frontend?.xterm) || isCliSelfUpdateCommand(inputLine)) {
@@ -1793,6 +1826,12 @@ export class WorkspaceService implements OnDestroy {
                 ? ['--settings', existingSettings, ...resumeArgs]
                 : resumeArgs;
             command = env ? { executable: task.executable, args, env } : { executable: task.executable, args };
+            if (project.distro && brandExec === 'agy') {
+                const clip = await prepareAgyWslClipboard(project).catch(() => undefined);
+                if (clip) {
+                    command = { ...command, wslClipBin: clip.binDir, env: { ...command.env, TABBY_ONEAI_CLIP_DIR: clip.wslClipDir } };
+                }
+            }
         }
         if (!command || this.bindings.get(task.id)?.pane !== pane) {
             if (dirty) try { pane.recoveryStateChangedHint?.next(); } catch {}

@@ -2,7 +2,7 @@
 
 **Bring 8 mainstream AI Coding CLIs into official Tabby -- keep 100% native terminal fidelity while managing multi-project, multi-agent sessions at a glance.**
 
-`v1.0.1` · `Tabby v1.0.238+` · `Windows (PowerShell 7) & WSL 2` · `MIT License`
+`v1.0.2` · `Tabby v1.0.238+` · `Windows (PowerShell 7) & WSL 2` · `MIT License`
 
 **[English](README.en.md) | [简体中文](README.md)**
 
@@ -72,16 +72,16 @@ All 8 CLIs include **local history discovery & exact resume**, **5-state live mo
 
 ```powershell
 $plugins = "$env:APPDATA\tabby\plugins\node_modules"
-$zip = "$env:TEMP\tabby-oneai-v1.0.1.zip"
+$zip = "$env:TEMP\tabby-oneai-v1.0.2.zip"
 New-Item -ItemType Directory -Path $plugins -Force | Out-Null
-Invoke-WebRequest -Uri "https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/download/v1.0.1/tabby-oneai-v1.0.1.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/download/v1.0.2/tabby-oneai-v1.0.2.zip" -OutFile $zip
 Expand-Archive -LiteralPath $zip -DestinationPath $plugins -Force
 Remove-Item -LiteralPath $zip -Force
 ```
 
 **Option 2: Manual Download & Extract**
 
-1. Download `tabby-oneai-v1.0.1.zip` from [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest);
+1. Download `tabby-oneai-v1.0.2.zip` from [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest);
 2. Place the `tabby-oneai` folder inside the zip directly into `%APPDATA%\tabby\plugins\node_modules\` (create `plugins` / `node_modules` manually if they do not exist yet);
 3. Restart Tabby to see the **AI Workbench** sidebar on the left.
 
