@@ -1,6 +1,6 @@
 {
   "name": "tabby-oneai",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Project-based AI CLI workspace for Tabby",
   "author": "Dongdong <w6626176@gmail.com>",

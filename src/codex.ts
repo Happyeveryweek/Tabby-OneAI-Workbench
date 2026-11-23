@@ -26,16 +26,24 @@ function stored<T>(key: string, fallback: T): T {
     catch { return fallback; }
 }
 
+function cleanWindowsPath(value: string): string {
+    return value.replace(/^\\\\\?\\/, '');
+}
+
 export function equalPath(left: string, right: string, distro?: string): boolean {
     return distro ? posix.resolve(left) === posix.resolve(right)
-        : win32.resolve(left.replace(/^\\\\\?\\/, '')).toLowerCase() === win32.resolve(right.replace(/^\\\\\?\\/, '')).toLowerCase();
+        : win32.resolve(cleanWindowsPath(left)).toLowerCase() === win32.resolve(cleanWindowsPath(right)).toLowerCase();
 }
 
 export function withinProject(cwd: string, root: string, distro?: string): boolean {
     const path = distro ? posix : win32;
-    if (!path.isAbsolute(cwd)) return false;
-    if (equalPath(cwd, root, distro)) return true;
-    const relative = path.relative(root, cwd);
+    const cleanCwd = distro ? cwd : cleanWindowsPath(cwd);
+    const cleanRoot = distro ? root : cleanWindowsPath(root);
+    if (!path.isAbsolute(cleanCwd) || !path.isAbsolute(cleanRoot)) return false;
+    if (equalPath(cleanCwd, cleanRoot, distro)) return true;
+    const relative = distro
+        ? posix.relative(posix.resolve(cleanRoot), posix.resolve(cleanCwd))
+        : win32.relative(win32.resolve(cleanRoot).toLowerCase(), win32.resolve(cleanCwd).toLowerCase());
     return Boolean(relative && relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative));
 }
 
@@ -81,6 +89,16 @@ export class CodexService {
     }
 
     reloadDefault(distro?: string): void { this.defaults.delete(distro ?? ''); }
+
+    clearHistoryCache(distro?: string): void {
+        this.defaults.delete(distro ?? '');
+        const prefix = `${distro ?? 'windows'}|`;
+        for (const key of [...this.recent.keys()]) {
+            if (!distro ? !key.includes('|') || key.startsWith(prefix) : key.startsWith(prefix) || key.includes(distro)) {
+                this.recent.delete(key);
+            }
+        }
+    }
 
     async scope(distro?: string, accountId = defaultAccount): Promise<CodexScope> {
         let account: Account;

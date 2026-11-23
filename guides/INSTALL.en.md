@@ -21,14 +21,14 @@ Run the following script in PowerShell to download the pre-built release archive
 
 ```powershell
 $plugins = "$env:APPDATA\tabby\plugins\node_modules"
-$zip = "$env:TEMP\tabby-oneai-v1.0.0.zip"
+$zip = "$env:TEMP\tabby-oneai-v1.0.1.zip"
 New-Item -ItemType Directory -Path $plugins -Force | Out-Null
-Invoke-WebRequest -Uri "https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/download/v1.0.0/tabby-oneai-v1.0.0.zip" -OutFile $zip
+Invoke-WebRequest -Uri "https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/download/v1.0.1/tabby-oneai-v1.0.1.zip" -OutFile $zip
 Expand-Archive -LiteralPath $zip -DestinationPath $plugins -Force
 Remove-Item -LiteralPath $zip -Force
 ```
 
-**Restart Tabby** after running the script. The **AI Workbench (`v1.0.0`)** sidebar will appear on the left.
+**Restart Tabby** after running the script. The **AI Workbench (`v1.0.1`)** sidebar will appear on the left.
 
 > To upgrade later, simply replace the version number in the script and re-run it -- your added projects and settings are preserved.
 
@@ -36,12 +36,12 @@ Remove-Item -LiteralPath $zip -Force
 
 ### Option 2: Manual Download & Extract
 
-1. Download **`tabby-oneai-v1.0.0.zip`** from [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest);
+1. Download **`tabby-oneai-v1.0.1.zip`** from [**GitHub Releases**](https://github.com/Happyeveryweek/Tabby-OneAI-Workbench/releases/latest);
 2. Press `Win + R`, enter **`%APPDATA%\tabby`**, and press Enter to open Tabby's config directory, then navigate into `plugins` → `node_modules`:
    - **If `plugins` or `node_modules` does not exist yet** (common on a fresh Tabby install), create `plugins` inside `%APPDATA%\tabby`, then create `node_modules` inside `plugins`;
 3. **The zip already contains the top-level `tabby-oneai` folder**. Place that `tabby-oneai` folder directly inside `node_modules`:
    - Keep the `tabby-oneai` folder level;
-   - **Do not double-nest** (e.g., `node_modules\tabby-oneai-v1.0.0\tabby-oneai` or `node_modules\tabby-oneai\tabby-oneai` will not be loaded by Tabby).
+   - **Do not double-nest** (e.g., `node_modules\tabby-oneai-v1.0.1\tabby-oneai` or `node_modules\tabby-oneai\tabby-oneai` will not be loaded by Tabby).
 
 Your final folder structure must look like this:
 

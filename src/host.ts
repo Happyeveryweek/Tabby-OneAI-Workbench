@@ -24,6 +24,10 @@ export interface Tab {
     readonly frontend?: { readonly title$: Observable<string>; readonly input$?: Observable<Buffer | string>; readonly xterm?: TerminalScreen };
     readonly frontendReady$?: Observable<void>;
     readonly initialized$?: Observable<void>;
+    readonly recoveryStateChangedHint?: { next(): void };
+    frontendIsReady?: boolean;
+    savedState?: unknown;
+    getRecoveryToken?(options?: { includeState?: boolean }): Promise<Record<string, unknown> | null>;
     getAllTabs?(): Tab[];
     getFocusedTab?(): Tab | null;
     focus?(tab: Tab): void;

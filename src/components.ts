@@ -430,6 +430,9 @@ const theme = `
                 <button *ngIf="actionProject" type="button" [class.menu-divider]="cliOptions.length || detecting || cliProbeFailed" (click)="searchProjectSessions()">
                     <i class="fas fa-search" aria-hidden="true"></i>{{ i18n.text('查找历史会话…', 'Find Session History…') }}
                 </button>
+                <button *ngIf="actionProject" type="button" (click)="refreshProjectHistoryFromAction()">
+                    <i class="fas fa-sync-alt" aria-hidden="true"></i>{{ i18n.text('刷新历史会话', 'Refresh Session History') }}
+                </button>
                 <button *ngIf="actionProject" type="button" (click)="openProjectFolderFromAction()">
                     <i class="fas fa-folder-open" aria-hidden="true"></i>{{ i18n.text('打开项目文件夹', 'Open Project Folder') }}
                 </button>
@@ -869,6 +872,14 @@ export class ProjectsComponent implements OnInit, OnDestroy {
         const project = this.actionProject;
         this.actionsMenu.nativeElement.hidePopover();
         this.navigation.open('search', undefined, project, cli);
+    }
+
+    refreshProjectHistoryFromAction(): void {
+        const project = this.actionProject;
+        if (!project) return;
+        this.actionsMenu.nativeElement.hidePopover();
+        this.folderError = '';
+        void this.workspace.refreshProjectHistory(project);
     }
 
     async openProjectFolderFromAction(): Promise<void> {

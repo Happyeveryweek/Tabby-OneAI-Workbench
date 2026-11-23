@@ -87,6 +87,11 @@ export class CliHistory {
 
     constructor(private readonly directories = new CliDirectories()) {}
 
+    clearCache(): void {
+        this.sessionFileCache.clear();
+        this.agyHistoryCache.clear();
+    }
+
     async list(project: Project, limit: number, available: (name: string) => Promise<boolean>): Promise<CliSession[]> {
         const homesPromise = this.directories.homes(project.distro).catch(() => undefined);
         const [pi, agy, kimi, claude, openCode, grok, copilot] = await Promise.all([

@@ -163,6 +163,29 @@ export function hasScreenInterrupt(screen?: TerminalScreen): boolean {
     return false;
 }
 
+export function hasScreenAuthPrompt(screen?: TerminalScreen): boolean {
+    if (!screen?.buffer?.active || hasScreenInterrupt(screen) || hasActiveFooterTasks(screen)) return false;
+    const buffer = screen.buffer.active;
+    const bottom = buffer.type === 'alternate' ? screen.rows - 1 : Math.min(screen.rows - 1, buffer.cursorY + 14);
+    const lines: string[] = [];
+    for (let offset = 0; offset < Math.min(28, bottom + 1) && lines.length < 24; offset++) {
+        const line = buffer.getLine(buffer.baseY + bottom - offset)?.translateToString(true).trim() ?? '';
+        if (line) lines.push(line);
+    }
+    if (!lines.length) return false;
+    const joined = lines.join('\n');
+    if (/\?\s*for shortcuts\b|\b(?:accept-edits|acceptEdits|auto-edit)\s*·|\bAsk Codex to do anything\b|\bType @ to mention\b|\[Dashboard\]/i.test(joined)) {
+        return false;
+    }
+    return /\bWaiting for (?:authentication|authorization|login|sign[- ]?in)\b/i.test(joined)
+        || /\b(?:Sign in|Log in|Login)\s+(?:with|to|using)\s+(?:Google|GitHub|ChatGPT|OpenAI|Anthropic|Claude|xAI|Grok|Kimi|your\s+account|browser)\b/i.test(joined)
+        || /\b(?:Select|Choose)\s+(?:a\s+)?(?:login|auth(?:entication)?|sign[- ]?in)\s+method\b/i.test(joined)
+        || /\b(?:Authentication|Login|Sign[- ]?in)\s+required\b|\bNot\s+(?:logged|signed)\s+in\b|\bPlease\s+(?:log|sign)\s+in\b/i.test(joined)
+        || /\b(?:Enter|Paste)\s+(?:the\s+)?(?:authorization|verification|one-time|device)\s+code\b/i.test(joined)
+        || (/\bPress\s+Enter\s+to\s+(?:open|sign\s+in|log\s+in|authenticate)\b/i.test(joined) && /\b(?:auth|login|sign[- ]?in|oauth|browser|account)\b/i.test(joined))
+        || (/\bhttps?:\/\/\S+(?:oauth|login|auth|device)\S*/i.test(joined) && /\b(?:code|browser|authenticate|authorize|sign\s+in|log\s+in)\b/i.test(joined));
+}
+
 export function codexScreenIsIdle(screen?: TerminalScreen): boolean {
     if (!screen?.buffer?.active || hasScreenInterrupt(screen)) return false;
     const buffer = screen.buffer.active;
@@ -527,6 +550,9 @@ export class WorkspaceService implements OnDestroy {
     private readonly turnArmed = new Set<string>();
     private readonly newSessionExcludedKeys = new Map<string, Set<string>>();
     private readonly agyLiveSessionIds = new Map<string, string>();
+    private readonly authWaitingTasks = new Set<string>();
+    private readonly authRetriedTasks = new Set<string>();
+    private readonly restartingTasks = new Set<string>();
     private readonly updatingTasks = new Map<string, { startedAt: number; output: string; restarting?: boolean }>();
     private readonly titleIds = new Map<string, string>();
     private readonly claudeTranscripts = new Map<string, string>();
@@ -694,6 +720,17 @@ export class WorkspaceService implements OnDestroy {
 
     refreshRecentHistory(): void {
         for (const project of this.projects) void this.loadRecentHistory(project);
+    }
+
+    async refreshProjectHistory(project: Project): Promise<void> {
+        this.cliHistory.clearCache();
+        this.codex.clearHistoryCache(project.distro);
+        this.cliDirectories.reload(project.distro);
+        await Promise.all([
+            this.loadRecentHistory(project),
+            this.refreshBranch(project),
+            this.availableCli(project.distro, true).catch(() => undefined),
+        ]);
     }
 
     async refreshRuntimeHistory(distro?: string): Promise<void> {
@@ -1162,6 +1199,10 @@ export class WorkspaceService implements OnDestroy {
             const screenErr = safeActivity === 'ready' && screen && terminalEditorActivity(screen) === 'error';
             const rawResolved = tasksRunning ? 'working' : safeActivity === 'ready' && (hasError || screenErr) ? 'error' : safeActivity;
             const resolved = this.resolveTaskActivity(task, pane, rawResolved);
+            if (fresh && (detail.quota || sessionId) && this.authWaitingTasks.has(task.id)) {
+                this.authWaitingTasks.delete(task.id);
+                this.recoverSiblingAuthWaitingTasks(task);
+            }
             this.setActivity(task, resolved);
             if (sessionId && transcript && this.claudeTranscripts.get(task.id) !== transcript) {
                 this.claudeTranscripts.set(task.id, transcript);
@@ -1314,6 +1355,20 @@ export class WorkspaceService implements OnDestroy {
             return origCanClose ? origCanClose() : true;
         };
         events.add(() => { pane.canClose = origCanClose; });
+        if (restored && isTrackedAiTask(task) && this.hasPersistedSession(task) && !pane.frontendIsReady && pane.savedState) {
+            try { pane.savedState = null; } catch { /* Ignore readonly savedState. */ }
+        }
+        const origGetRecoveryToken = pane.getRecoveryToken?.bind(pane);
+        if (origGetRecoveryToken) {
+            pane.getRecoveryToken = async (options) => {
+                const token = await origGetRecoveryToken(options);
+                if (token && isTrackedAiTask(task) && this.hasPersistedSession(task)) {
+                    token.savedState = null;
+                }
+                return token;
+            };
+            events.add(() => { pane.getRecoveryToken = origGetRecoveryToken; });
+        }
         if (pane.profile && pane.profile.behaviorOnSessionEnd !== 'close') {
             try { pane.profile.behaviorOnSessionEnd = 'close'; } catch { /* Ignore readonly profile proxy. */ }
         }
@@ -1339,7 +1394,7 @@ export class WorkspaceService implements OnDestroy {
         const shouldDiscardEmpty = () =>
             !task.error && !this.updatingTasks.has(task.id) && isTrackedAiTask(task) && !this.hasPersistedSession(task);
         const stopped = () => {
-            if (this.updatingTasks.get(task.id)?.restarting) return;
+            if (this.restartingTasks.has(task.id) || this.updatingTasks.get(task.id)?.restarting) return;
             if (shouldDiscardEmpty()) {
                 this.zone.run(() => this.discardEmptyTask(task));
                 return;
@@ -1347,6 +1402,7 @@ export class WorkspaceService implements OnDestroy {
             this.zone.run(() => this.setTaskStatus(task, task.error ? 'failed' : 'stopped'));
         };
         const onSessionClosed = () => {
+            if (this.restartingTasks.has(task.id)) return;
             const updateState = this.updatingTasks.get(task.id);
             if (updateState) {
                 if (updateState.restarting) return;
@@ -1461,13 +1517,20 @@ export class WorkspaceService implements OnDestroy {
                 const runCheck = () => {
                     throttleTimer = undefined;
                     lastRun = Date.now();
-                    if (this.updatingTasks.has(task.id)) return;
+                    if (this.updatingTasks.has(task.id) || this.restartingTasks.has(task.id)) return;
+                    if (!this.turnArmed.has(task.id) && hasScreenAuthPrompt(screen)) {
+                        this.authWaitingTasks.add(task.id);
+                        if (task.activity !== 'waiting') this.zone.run(() => this.setActivity(task, 'waiting'));
+                        return;
+                    }
                     if (task.activity === 'working' && codexScreenIsIdle(screen)) {
                         const next = !hasScreenAbort(screen) && (task.error || task.detail?.hasError || codexScreenHasError(screen)) ? 'error' : 'ready';
                         this.zone.run(() => this.setActivity(task, next));
                     } else if (task.activity !== 'working' && hasScreenInterrupt(screen)) {
                         this.turnArmed.add(task.id);
                         this.zone.run(() => this.setActivity(task, 'working'));
+                    } else if (this.authWaitingTasks.has(task.id) && codexScreenIsIdle(screen)) {
+                        this.zone.run(() => this.setActivity(task, 'ready'));
                     }
                 };
                 this.zone.runOutsideAngular(() => {
@@ -1516,7 +1579,13 @@ export class WorkspaceService implements OnDestroy {
                     const runUpdate = () => {
                         throttleTimer = undefined;
                         lastRun = Date.now();
+                        if (this.restartingTasks.has(task.id)) return;
                         if (hasScreenInterrupt(screen) || hasActiveFooterTasks(screen)) this.turnArmed.add(task.id);
+                        if (!this.turnArmed.has(task.id) && !this.updatingTasks.has(task.id) && hasScreenAuthPrompt(screen)) {
+                            this.authWaitingTasks.add(task.id);
+                            if (task.activity !== 'waiting') this.zone.run(() => this.setActivity(task, 'waiting'));
+                            return;
+                        }
                         const activity = this.resolveTaskActivity(task, pane, readActivity(screen));
                         if (executable === 'agy' && task.detail?.quota) {
                             const meterActivity = this.agyMeterActivities.get(task.id);
@@ -1682,10 +1751,17 @@ export class WorkspaceService implements OnDestroy {
         if (!pane?.profile || !parentProject) return;
         const project = task.directory ? { ...parentProject, directory: task.directory } : parentProject;
         const nextTitle = `${task.name} · ${project.name}`;
+        let dirty = false;
         try {
-            if (pane.profile.name !== nextTitle) pane.profile.name = nextTitle;
+            if (pane.profile.name !== nextTitle) {
+                pane.profile.name = nextTitle;
+                dirty = true;
+            }
         } catch { /* Ignore readonly profile proxy. */ }
-        if (!pane.profile.options) return;
+        if (!pane.profile.options) {
+            if (dirty) try { pane.recoveryStateChangedHint?.next(); } catch {}
+            return;
+        }
         const cli = configurableCli(task.executable);
         const brandExec = cliBrand(task.executable)?.executable;
         const dataDirectory = task.cliSession?.dataDirectory ?? task.dataDirectory;
@@ -1694,9 +1770,15 @@ export class WorkspaceService implements OnDestroy {
         const env = brandExec === 'pi' ? { ...baseEnv, PI_PROGRAM_STATUS: '1' } : baseEnv;
         let command: Command | undefined;
         if (task.codex) {
-            if (!task.codex.sessionId) return;
+            if (!task.codex.sessionId) {
+                if (dirty) try { pane.recoveryStateChangedHint?.next(); } catch {}
+                return;
+            }
             const directory = codexScopeDir ?? (await this.codex.scope(project.distro, task.codex.accountId).catch(() => undefined))?.directory;
-            if (!directory) return;
+            if (!directory) {
+                if (dirty) try { pane.recoveryStateChangedHint?.next(); } catch {}
+                return;
+            }
             command = {
                 executable: task.executable,
                 codexHome: directory,
@@ -1712,10 +1794,82 @@ export class WorkspaceService implements OnDestroy {
                 : resumeArgs;
             command = env ? { executable: task.executable, args, env } : { executable: task.executable, args };
         }
-        if (!command || this.bindings.get(task.id)?.pane !== pane) return;
+        if (!command || this.bindings.get(task.id)?.pane !== pane) {
+            if (dirty) try { pane.recoveryStateChangedHint?.next(); } catch {}
+            return;
+        }
+        const nextOptions = commandFor(project, command);
+        const targetOptions = pane.profile.options as Record<string, unknown>;
         try {
-            pane.profile.options = commandFor(project, command);
-        } catch { /* Keep existing profile options if readonly. */ }
+            // Tabby wraps pane.profile in ConfigProxy where `options` is a getter-only nested proxy;
+            // mutating leaf keys (`command`, `args`, `cwd`, `env`) updates the real underlying config object.
+            targetOptions.command = nextOptions.command;
+            targetOptions.args = nextOptions.args;
+            if (nextOptions.cwd !== undefined) targetOptions.cwd = nextOptions.cwd;
+            if (nextOptions.env !== undefined) targetOptions.env = nextOptions.env;
+            dirty = true;
+        } catch {
+            try {
+                pane.profile.options = nextOptions;
+                dirty = true;
+            } catch { /* Keep existing profile options if readonly. */ }
+        }
+        if (dirty) {
+            try { pane.recoveryStateChangedHint?.next(); } catch { /* Ignore if unavailable. */ }
+        }
+    }
+
+    private authRuntimeKey(task: Task): string | undefined {
+        const project = this.projectFor(task);
+        if (!project) return undefined;
+        const exec = task.codex ? 'codex' : (cliBrand(task.executable)?.executable ?? task.cliSession?.executable);
+        if (!exec) return undefined;
+        return `${project.distro?.toLowerCase() ?? 'windows'}|${exec}`;
+    }
+
+    private recoverSiblingAuthWaitingTasks(authenticatedTask: Task): void {
+        const key = this.authRuntimeKey(authenticatedTask);
+        if (!key) return;
+        for (const other of this.tasks) {
+            if (other.id === authenticatedTask.id) continue;
+            if (!this.authWaitingTasks.has(other.id) || this.authRetriedTasks.has(other.id)) continue;
+            if (this.turnArmed.has(other.id) || this.updatingTasks.has(other.id) || this.restartingTasks.has(other.id)) continue;
+            if (this.authRuntimeKey(other) !== key) continue;
+            const binding = this.bindings.get(other.id);
+            if (!binding) continue;
+            this.authRetriedTasks.add(other.id);
+            this.authWaitingTasks.delete(other.id);
+            void this.restartAuthSiblingInPlace(other, binding.pane, binding.events);
+        }
+    }
+
+    private async restartAuthSiblingInPlace(task: Task, pane: Tab, events: Subscription): Promise<void> {
+        if (events.closed || this.bindings.get(task.id)?.pane !== pane) return;
+        this.restartingTasks.add(task.id);
+        this.zone.run(() => {
+            task.error = undefined;
+            task.activity = undefined;
+            this.setTaskStatus(task, 'starting');
+        });
+        if (pane.profile && pane.profile.behaviorOnSessionEnd !== 'keep') {
+            try { pane.profile.behaviorOnSessionEnd = 'keep'; } catch {}
+        }
+        try {
+            const oldSession = pane.session as (NonNullable<Tab['session']> & { destroy?(): Promise<void> | void }) | null | undefined;
+            if (oldSession && typeof oldSession.destroy === 'function') {
+                await Promise.resolve(oldSession.destroy()).catch(() => undefined);
+            }
+        } catch {}
+        try {
+            if (!events.closed && this.bindings.get(task.id)?.pane === pane) {
+                await this.restartUpdatedSessionInPlace(task, pane, events);
+            }
+        } finally {
+            this.restartingTasks.delete(task.id);
+            if (pane.profile && pane.profile.behaviorOnSessionEnd !== 'close') {
+                try { pane.profile.behaviorOnSessionEnd = 'close'; } catch {}
+            }
+        }
     }
 
     private async restartUpdatedSessionInPlace(task: Task, pane: Tab, events: Subscription): Promise<void> {
@@ -1768,6 +1922,10 @@ export class WorkspaceService implements OnDestroy {
             task.unread = true;
         }
         this.setTaskStatus(task, task.status);
+        if (this.authWaitingTasks.has(task.id) && (activity === 'ready' || activity === 'working')) {
+            this.authWaitingTasks.delete(task.id);
+            this.recoverSiblingAuthWaitingTasks(task);
+        }
         if (previous === 'working' || activity === 'working' || activity === 'ready' || activity === 'error') {
             task.lastActiveAt = Date.now();
             try { this.saveTask(task); } catch { /* The live status still applies. */ }
@@ -1883,6 +2041,9 @@ export class WorkspaceService implements OnDestroy {
         this.turnArmed.delete(task.id);
         this.newSessionExcludedKeys.delete(task.id);
         this.agyLiveSessionIds.delete(task.id);
+        this.authWaitingTasks.delete(task.id);
+        this.authRetriedTasks.delete(task.id);
+        this.restartingTasks.delete(task.id);
         this.updatingTasks.delete(task.id);
         this.titleIds.delete(task.id);
         this.claudeTranscripts.delete(task.id);
